@@ -149,7 +149,7 @@ static	void	Print_menu()
 
 static	void	Read_message()
 {
-/*
+
 	static	char		 mess[MAX_MESSLEN];
 	char		 sender[MAX_GROUP_NAME];
 	char		 target_groups[MAX_MEMBERS][MAX_GROUP_NAME];
@@ -170,6 +170,7 @@ static	void	Read_message()
 	ret = SP_receive( Mbox, &service_type, sender, 100, &num_groups, target_groups,
 			&mess_type, &endian_mismatch, sizeof(mess), mess );
 	printf("\n============================\n");
+
 	if( ret < 0 )
 	{
 		if ( (ret == GROUPS_TOO_SHORT) || (ret == BUFFER_TOO_SHORT) ) {
@@ -257,7 +258,6 @@ static	void	Read_message()
 				sender, service_type, mess_type, endian_mismatch, num_groups, ret, mess );
 	}else printf("received message of unknown message type 0x%x with ret %d\n", service_type, ret);
 
-	*/
 	printf("\n");
 	printf("User> ");
 	fflush(stdout);
