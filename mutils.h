@@ -28,8 +28,6 @@
 #define	REQ_DEL 	2
 #define REQ_HEAD	3
 #define REQ_MSG		4
-#define	REQ_USER	5
-#define REQ_SERV	6
 #define REQ_SEND	7
 #define REQ_MEM		8
 
@@ -85,6 +83,9 @@ char user_name[LEN_USER];
 struct email_list *next_email;
 	struct user_list *next_user;
 } user_list;
+
+//Define array of server groups
+char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
 //Define functions used by both client and server
 //read_message();
