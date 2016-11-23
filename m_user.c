@@ -27,12 +27,16 @@ static  int     To_exit = 0;
 #define MAX_VSSETS      10
 #define MAX_MEMBERS     100
 
+static	char	username[11];
+
 static	void	Print_menu();
 static	void	User_command();
 static	void	Usage( int argc, char *argv[] );
 static  void    Print_help();
 static  void	Bye();
 static	void	Read_message();
+static	int		Check_user_name();
+static void print_change_uname();
 
 int main( int argc, char *argv[] )
 {
@@ -41,14 +45,17 @@ int main( int argc, char *argv[] )
 
 	test_timeout.sec = 5;
 	test_timeout.usec = 0;
-	sprintf( User, "user" );
+	sprintf( User, "" );
 	sprintf( Spread_name, "4803");
+	strcpy(username, "User");
 	ret = SP_connect_timeout( Spread_name, User, 0, 1, &Mbox, Private_group, test_timeout );
 	if( ret != ACCEPT_SESSION )
 	{
 		SP_error( ret );
 		Bye();
 	}
+	printf("User: connected to %s with private group %s\n", Spread_name, Private_group );
+	ret = SP_join ( Mbox, "Browne");
 
 	E_init();
 	E_attach_fd( 0, READ_FD, User_command, 0, NULL, LOW_PRIORITY );
@@ -56,7 +63,7 @@ int main( int argc, char *argv[] )
 
 	Print_menu();
 
-	printf("\nUser> ");
+	printf("\n%s> ", username);
 	fflush(stdout);
 
 	Num_sent = 0;
@@ -79,36 +86,78 @@ static	void	User_command()
 
 	for( i=0; i < sizeof(command); i++ ) command[i] = 0;
 	if( fgets( command, 130, stdin ) == NULL )
-		Bye();
+	{
+		printf("Unrecognized user command.  Please make your selection again.\n");
+		Print_menu();
+		return;
+	}
 
 	switch( command[0] )
 	{
 		case 'u'://to login
-			//implement u
+			ret = sscanf( &command[2], "%10s", username);
+			if( ret < 1 )
+			{
+				printf(" invalid username.\n");
+				printf("\n%s> ", username);
+				break;
+			}
+			Print_menu();
 			break;
 
 		case 'c': //connect to server
 			//implement c
+			Print_menu();
 			break;
 
 		case 'l':
+			if (Check_user_name())
+			{
+				print_change_uname();
+				Print_menu();
+				break;
+			}
 			//implement l
+			Print_menu();
 			break;
 
 		case 'm':
+			if (Check_user_name())
+			{
+				print_change_uname();
+				Print_menu();
+				break;
+			}
 			//implement m
+
+			Print_menu();
 			break;
 
 		case 'd':
+			if (Check_user_name())
+			{
+				print_change_uname();
+				Print_menu();
+				break;
+			}
 			//implement d
+			Print_menu();
 			break;
 
 		case 'r':
+			if (Check_user_name())
+			{
+				print_change_uname();
+				Print_menu();
+				break;
+			}
 			//imp r
+			Print_menu();
 			break;
 
 		case 'v':
 			// imp v
+			Print_menu();
 			break;
 
 		case 'q':
@@ -118,11 +167,8 @@ static	void	User_command()
 		default:
 			printf("\nUnknown commnad\n");
 			Print_menu();
-
 			break;
 	}
-	printf("\nUser> ");
-	fflush(stdout);
 
 }
 
@@ -133,7 +179,7 @@ static	void	Print_menu()
 	printf("User Menu:\n");
 	printf("----------\n");
 	printf("\n");
-	printf("\tu <user name> -- login as user\n");
+	printf("\tu <user name> -- login as user.  Limit 10 chars.\n");
 	printf("\tc <server index> -- connect to server\n");
 	printf("\tl  -- list messages\n");
 	printf("\tm -- follow prompts to send message\n");
@@ -141,6 +187,8 @@ static	void	Print_menu()
 	printf("\tr <list number> -- read a message (stuck) \n");
 	printf("\tv -- print server membership \n");
 	printf("\tq -- quit\n");
+
+	printf("\n%s> ", username);
 	fflush(stdout);
 }
 
@@ -304,10 +352,23 @@ static  void	Bye()
 	exit( 0 );
 }
 
+static	int		Check_user_name(){
+	char	uname[5] = "User";
+	if (strncmp(uname, username, 5))
+	{
+		return 0;
+	}
+	return 1;
+}
+
+static void print_change_uname()
+{
+	printf("Change username before performing this function.\n");
+}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History
 //  11/15/2016 JB: Cleaned up code from project 3 to use in project 4.
-//
+//  11/26/2016 JB: Added username functionality.
 //
 ////////////////////////////////////////////////////////////////////////////////
