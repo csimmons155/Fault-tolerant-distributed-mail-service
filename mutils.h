@@ -30,11 +30,13 @@
 #define REQ_MSG		4
 #define REQ_SEND	7
 #define REQ_MEM		8
+#define REQ_JOIN	9
+#define REQ_LEV		10
 
 //header type defs, to client
-#define SEND_HEAD	3
-#define SEND_MSG	4
-#define SEND_MEM	8
+#define SEND_HEAD	5
+#define SEND_MSG	6
+#define SEND_MEM	1
 
 //message field lengths
 #define LEN_USER	10
@@ -47,8 +49,19 @@
 #define BS3			"BS3"
 #define BS4			"BS4"
 #define BS5			"BS5"
+#define ALL_SVR		"ALL_SVR"
+#define ALL_TEST	"ALL_TEST"
+
+#define MAX_MESSLEN     102400
+#define MAX_VSSETS      10
+#define MAX_MEMBERS     100
 
 #define int32u unsigned int
+
+////////////////////////////////////////////////////////////////////////////////
+//structure holding server public groups.
+////////////////////////////////////////////////////////////////////////////////
+char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
 ////////////////////////////////////////////////////////////////////////////////
 //Linked list to hold user's messages.
@@ -83,9 +96,6 @@ char user_name[LEN_USER];
 struct email_list *next_email;
 	struct user_list *next_user;
 } user_list;
-
-//Define array of server groups
-char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
 //Define functions used by both client and server
 //read_message();
