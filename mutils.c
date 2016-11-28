@@ -11,105 +11,155 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "mutils.h"
 
+void get_user_box(user_list* user , char* to_user, user_list* head);
 
+////////////////////////////////////////////////////////////////////////////////
+//add received message to the mailbox.
+///////////////////////////////////////////////////////////////////////////////
+void add_message(int msg_id, int rec_svr, char* buffer, user_list* head)
+{
+	char to_user[LEN_USER];
+	char from_user[LEN_USER];
+	char subject[LEN_SUB];
+	char email[LEN_MSG];
+	int total_length = sizeof(int);
+//get all of the required strings.
+	strncpy(to_user, buffer+total_length, LEN_USER);
+	total_length += LEN_USER;
+	strncpy(from_user, buffer+total_length, LEN_USER);
+	total_length += LEN_USER;
+	strncpy(subject, buffer+total_length, LEN_SUB);
+	total_length += LEN_SUB;
+	strncpy(email, buffer+total_length, LEN_MSG);
+
+	printf("got a message:\n\nto: %s\nfrom: %s\nsubject: %s\nmsg: %s\n", to_user, from_user, subject, email);
+
+user_list* user = NULL;
+get_user_box(user, to_user, head);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//search for to_user's mailbox.  if doesn't exist make it.  mailbox
+//address.
+/////////////////////////////////////////////////////////////////////////////
+void get_user_box(user_list* user , char* to_user, user_list* head)
+{
+	user_list* temp = head;
+	while (temp != NULL)
+	{
+		if (!strcmp(temp->user_name, to_user))
+		{
+			user = temp;
+			return;
+		}else
+		{
+			temp = temp->next_user;
+		}
+	}
+	user = malloc(sizeof(user_list));
+strcpy(user->user_name,to_user);
+user->next_email = NULL;
+user->next_user = head;
+head = user;
+}
+
+/*
 ///////////////////////////////////////////////////////////////////////
 //receive start message.  No timeout, reliable receive, print wait status.
 //When start message received, end function
 void rx_start(int sr)
 {
-	fd_set             mask;
-	fd_set             dummy_mask;
-	int                bytes;
-	int                num;
-	char               mess_buf[MAX_PACKET_LEN];
-	char			   targetStr[6] = "start";
-	targetStr[5] =0;
-	struct timeval timeout;
+fd_set             mask;
+fd_set             dummy_mask;
+int                bytes;
+int                num;
+char               mess_buf[MAX_PACKET_LEN];
+char			   targetStr[6] = "start";
+targetStr[5] =0;
+struct timeval timeout;
 
-	FD_ZERO( &mask );
-	FD_ZERO( &dummy_mask );
-	FD_SET( sr, &mask );
-	for(;;)
-	{
-		fd_set temp_mask = mask;
-		timeout.tv_sec = 10;
-		timeout.tv_usec = 0;
+FD_ZERO( &mask );
+FD_ZERO( &dummy_mask );
+FD_SET( sr, &mask );
+for(;;)
+{
+fd_set temp_mask = mask;
+timeout.tv_sec = 10;
+timeout.tv_usec = 0;
 
-		num = select( FD_SETSIZE, &temp_mask, &dummy_mask, &dummy_mask, &timeout);
-		if (num > 0)
-		{
-			if ( FD_ISSET( sr, &temp_mask) )
-			{
-				bytes = recv( sr, mess_buf, sizeof(mess_buf), 0 );
-				mess_buf[bytes] = 0;
-				if (!strncmp(targetStr, mess_buf, bytes))
-				{
-					printf("\nstarting process\n");
-					return;
-				}
-			}
-		} else
-		{
-			printf(".");
-			fflush(stdout);
-		}
-	}
+num = select( FD_SETSIZE, &temp_mask, &dummy_mask, &dummy_mask, &timeout);
+if (num > 0)
+{
+if ( FD_ISSET( sr, &temp_mask) )
+{
+bytes = recv( sr, mess_buf, sizeof(mess_buf), 0 );
+mess_buf[bytes] = 0;
+if (!strncmp(targetStr, mess_buf, bytes))
+{
+printf("\nstarting process\n");
+return;
 }
-
+}
+} else
+{
+printf(".");
+fflush(stdout);
+}
+}
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // receive and process packets until token is received.
 // /////////////////////////////////////////////////////////////////////////////////////
 void rx_probe(int sr, int ss, int addr, ran_block *start, int num_blocks_used, int *token, int *token_old, int loss_rate)
 {
-	int num_to_jump = 0;
-	int buff[BUFF_SIZE];
-	int stoptimer = 0;
-	while (1)
-	{
-		int bytes = rx(buff, sr, loss_rate);
-		if (bytes>0)
-		{
-			if (buff[PACKET_TYPE] == TYPE_TOKEN)
-			{
-				if (buff[TOKEN_ID] > token_old[TOKEN_ID])
-				{
-					memcpy(token, buff, bytes);
-					break;
-				}
-			}
-			else if(buff[PACKET_TYPE] == TYPE_DATA)
-			{
-				int temp = (num_blocks_used+1) * BLOCK_SIZE;
-				ran_block *temp_block= start;
-				while (temp <= buff[PACK_ID])
-				{
-					if (temp_block->next == NULL)
-					{
-						temp_block->next = malloc (sizeof(ran_block));
-						temp_block->next->num_used = 0;
-						temp_block->next->next = NULL;
-						memset(temp_block->next->block, 0 , BLOCK_SIZE*sizeof(wd));
-					}
-					temp_block = temp_block->next;
-					temp += BLOCK_SIZE;
-				}
-				temp_block->block[buff[PACK_ID]%BLOCK_SIZE].random_data= buff[RAN_NUM];
-				temp_block->block[buff[PACK_ID]%BLOCK_SIZE].machine_index= buff[M_INDEX];
-				temp_block->block[buff[PACK_ID]%BLOCK_SIZE].packet_index= buff[PACK_ID];
-			}
-		}else if (bytes < 0)
-		{
-stoptimer++;
-if (stoptimer > TOKEN_RESEND_COUNT)
+int num_to_jump = 0;
+int buff[BUFF_SIZE];
+int stoptimer = 0;
+while (1)
 {
-return;
+int bytes = rx(buff, sr, loss_rate);
+if (bytes>0)
+{
+if (buff[PACKET_TYPE] == TYPE_TOKEN)
+{
+if (buff[TOKEN_ID] > token_old[TOKEN_ID])
+{
+memcpy(token, buff, bytes);
+break;
 }
-			tx(token, ((H_SIZE+token[CONT])*sizeof(int)), addr, ss);
-		}
+}
+else if(buff[PACKET_TYPE] == TYPE_DATA)
+{
+int temp = (num_blocks_used+1) * BLOCK_SIZE;
+ran_block *temp_block= start;
+while (temp <= buff[PACK_ID])
+{
+	if (temp_block->next == NULL)
+	{
+		temp_block->next = malloc (sizeof(ran_block));
+		temp_block->next->num_used = 0;
+		temp_block->next->next = NULL;
+		memset(temp_block->next->block, 0 , BLOCK_SIZE*sizeof(wd));
 	}
+	temp_block = temp_block->next;
+	temp += BLOCK_SIZE;
 }
-
+temp_block->block[buff[PACK_ID]%BLOCK_SIZE].random_data= buff[RAN_NUM];
+temp_block->block[buff[PACK_ID]%BLOCK_SIZE].machine_index= buff[M_INDEX];
+temp_block->block[buff[PACK_ID]%BLOCK_SIZE].packet_index= buff[PACK_ID];
+}
+}else if (bytes < 0)
+{
+	stoptimer++;
+	if (stoptimer > TOKEN_RESEND_COUNT)
+	{
+		return;
+	}
+	tx(token, ((H_SIZE+token[CONT])*sizeof(int)), addr, ss);
+}
+}
+}
 
 //////////////////////////////////////////////////////////////////////////////////////
 // send a buffer of info to specified address.
@@ -122,7 +172,6 @@ void tx(int *buff,int buff_len, int addr, int ss)
 	send_addr.sin_port = htons (PORT);
 	sendto(ss, buff, buff_len, 0, (struct sockaddr *)&send_addr, sizeof(send_addr));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 // receive a packet of info and pass to caller.
@@ -154,7 +203,6 @@ int rx(int *buff, int sr, int loss_rate)
 	}
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////
 // Configure a socket to send MC traffic.
 //
@@ -179,7 +227,6 @@ int initSM()
 	return ss;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////////////
 //configure a socket to receive multicast traffic.
 int initRM(int mcast_addr)
@@ -188,7 +235,7 @@ int initRM(int mcast_addr)
 	struct ip_mreq mreq;
 	struct sockaddr_in mrecv_addr;
 
-	sr = socket(AF_INET, SOCK_DGRAM, 0); /* socket for receiving */
+	sr = socket(AF_INET, SOCK_DGRAM, 0); // socket for receiving
 	if (sr<0) {
 		perror("Mcast: socket");
 		exit(1);
@@ -205,7 +252,7 @@ int initRM(int mcast_addr)
 
 	mreq.imr_multiaddr.s_addr = mcast_addr;
 
-	/* the interface could be changed to a specific interface if needed */
+	// the interface could be changed to a specific interface if needed
 	mreq.imr_interface.s_addr = htonl( INADDR_ANY );
 
 	if (setsockopt(sr, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&mreq,
@@ -215,7 +262,6 @@ int initRM(int mcast_addr)
 	}
 	return sr;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////
 //configure a socket to use unicast traffic.
@@ -229,7 +275,6 @@ int initSU()
 	}
 	return su;
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////
 //send window of random numbers.
@@ -283,7 +328,6 @@ void send_window(int window_size, int *token, ran_block *start_ptr, int blocks_u
 	}
 }
 
-
 ////////////////////////////////////////////////////////////////////////////
 //This is used to process the CLI.
 //its not very robust, will break if wrong input allowed.
@@ -321,7 +365,6 @@ int get_cli(long *num_packets, int *machine_index, int *num_machines, int *loss_
 	return success;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////
 //open a file, fw, for writing.  name the file id#.out
 /////////////////////////////////////////////////////////////////////////
@@ -342,7 +385,6 @@ FILE* initFile(int procIDX)
 	}
 	return fw;
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////////
 // send retrans based on list provided.
@@ -381,7 +423,6 @@ void sendRetrans(int *buff, ran_block *start_ptr, int num_blocks, int machine_in
 		}
 	}
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////////
 //This will get all the IPs and store them in the IP_list.  This function
@@ -449,7 +490,6 @@ void getIPs(int *IP_list, int sr, int ss, int mcast_addr, int num_machines, int 
 	printf("done collecting IPs\n");
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //Set initial values for current and old token.
 ///////////////////////////////////////////////////////////////////////////////
@@ -471,7 +511,6 @@ void init_tokens(int *token, int *token_old)
 
 	//memcpy(token_old, token, H_SIZE * sizeof(int));
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //send token calculates aru, adds required nacks, then sends token unicast to
@@ -566,7 +605,6 @@ void send_token(int *token, ran_block *start, int num_blocks_used, int midx, int
 	tx(token, ((H_SIZE+token[CONT])*sizeof(int)), addr, ss);
 }
 
-
 //////////////////////////////////////////////////////////////////////////////
 // if any blocks exist below global_aru then write them to disk and free block.
 // ///////////////////////////////////////////////////////////////////////////
@@ -599,7 +637,6 @@ void clean_block(ran_block **start_ptr, int *num_blocks_used, int global_aru, FI
 	}
 }
 
-
 //////////////////////////////////////////////////////////////////////////////////
 // empty out the last block of random numbers prior to closing the file pointer.
 // ///////////////////////////////////////////////////////////////////////////////
@@ -630,7 +667,7 @@ void clean_last_block(ran_block **start_ptr, FILE *fw)
 		free(temp);
 		temp = *start_ptr;
 	}
-}
+}*/
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History

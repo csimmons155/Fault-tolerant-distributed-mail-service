@@ -42,6 +42,7 @@
 #define LEN_USER	10
 #define	LEN_SUB		80
 #define LEN_MSG		1000
+#define LEN_TOT		1104
 
 //server group names, defined to prevent FFing.
 #define BS1			"BS1"
@@ -61,7 +62,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //structure holding server public groups.
 ////////////////////////////////////////////////////////////////////////////////
-char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
+//char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
 ////////////////////////////////////////////////////////////////////////////////
 //Linked list to hold user's messages.
@@ -70,7 +71,7 @@ typedef struct email_list {
 char to_name[LEN_USER];//not sure this is needed.
 char from_name[LEN_USER];
 int read; //read equals zero if message is unread.
-int rec_srv; //server that origionally received the message from a client.
+int rec_svr; //server that origionally received the message from a client.
 int msg_id; //msg id assigned to msg from rec_srv.
 char subject[LEN_SUB];
 char msg[LEN_MSG];
@@ -82,7 +83,7 @@ char msg[LEN_MSG];
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct head_list {
 char from_name[LEN_USER];
-int rec_srv;
+int rec_svr;
 int msg_id;
 char subject[LEN_SUB];
 struct head_list *next_head;
@@ -97,8 +98,8 @@ struct email_list *next_email;
 	struct user_list *next_user;
 } user_list;
 
-//Define functions used by both client and server
-//read_message();
+//Define functions to work with structs.
+void add_message(int msg_id, int rec_svr, char* buffer, user_list* head);
 
 ////////////////////////////////////////////////////////////////////////////////
 //

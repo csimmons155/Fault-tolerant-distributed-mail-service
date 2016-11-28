@@ -16,12 +16,16 @@
 static  char    Spread_name[80];
 
 static  char    Private_group[MAX_GROUP_NAME];
-char			join_grp[MAX_GROUP_NAME];//used in Process:REQ_JOIN
+char			join_grp[MAX_GROUP_NAME];//used in Process:REQ_JOIN, REQ_LEV
 static  mailbox Mbox;
 int 			num_in_group = 0;
 int 			total_rec = 0;
+int				mid = 0;
 static  int     To_exit = 0;
 static 	FILE 	*fw;
+user_list*		head_user = NULL;
+int		server_id;
+char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
 /*
 #define MAX_MESSLEN     102400
@@ -47,23 +51,22 @@ void process_message(char* msg);
 int main( int argc, char *argv[] )
 {
 	////////////////Needed to receive messages./////////////////////////
-static	char		 mess[MAX_MESSLEN];
-		char		 sender[MAX_GROUP_NAME];
-		char		 target_groups[MAX_MEMBERS][MAX_GROUP_NAME];
-		membership_info  memb_info;
-		vs_set_info      vssets[MAX_VSSETS];
-		unsigned int     my_vsset_index;
-		int              num_vs_sets;
-		char             members[MAX_MEMBERS][MAX_GROUP_NAME];
-		int		 num_groups;
-		int		 service_type;
-		int16		 mess_type;
-		int		 endian_mismatch;
-		int		 i,j;
-////////////////////////////////////////////////////////////////////
+	static	char		 mess[MAX_MESSLEN];
+	char		 sender[MAX_GROUP_NAME];
+	char		 target_groups[MAX_MEMBERS][MAX_GROUP_NAME];
+	membership_info  memb_info;
+	vs_set_info      vssets[MAX_VSSETS];
+	unsigned int     my_vsset_index;
+	int              num_vs_sets;
+	char             members[MAX_MEMBERS][MAX_GROUP_NAME];
+	int		 num_groups;
+	int		 service_type;
+	int16		 mess_type;
+	int		 endian_mismatch;
+	int		 i,j;
+	////////////////////////////////////////////////////////////////////
 
 	int	    ret;
-	int		server_id;
 
 	//get command line arguments.
 	if (argc == 2)
@@ -154,9 +157,9 @@ static	char		 mess[MAX_MESSLEN];
 
 				if( Is_caused_join_mess( service_type ) )
 				{
-										printf("Due to the JOIN of %s\n", memb_info.changed_member );
+					printf("Due to the JOIN of %s\n", memb_info.changed_member );
 				}else if( Is_caused_leave_mess( service_type ) ){
-										printf("Due to the LEAVE of %s\n", memb_info.changed_member );
+					printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 				}else if( Is_caused_disconnect_mess( service_type ) ){
 					printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
 				}else if( Is_caused_network_mess( service_type ) ){
@@ -394,19 +397,27 @@ exit (0);
 ///////////////////////////////////////////////////////////////////////////
 void process_message(char* msg)
 {
-int msg_type = ((int*) msg)[0];
-printf("message received of type %d", msg_type);
+	int msg_type = ((int*) msg)[0];
+	printf("message received of type %d", msg_type);
 
-switch(msg_type)
-{
-	case REQ_JOIN:
-strcpy(join_grp , msg+sizeof(int));
-SP_join ( Mbox, join_grp);
-		break;
-	default:
-		printf("\nUnknown command received.\n");
-		break;
-}
+	switch(msg_type)
+	{
+		case REQ_JOIN:
+			strcpy(join_grp , msg+sizeof(int));
+			SP_join ( Mbox, join_grp);
+			break;
+case REQ_LEV:
+			strcpy(join_grp , msg+sizeof(int));
+			SP_leave ( Mbox, join_grp);
+			break;
+		case REQ_SEND:
+			mid++;
+add_message(mid, server_id, msg, head_user);
+						break;
+		default:
+			printf("\nUnknown command received.\n");
+			break;
+	}
 }
 ////////////////////////////////////////////////////////////////////////////////
 //

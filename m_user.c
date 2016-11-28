@@ -22,8 +22,9 @@ static  mailbox Mbox;
 static	int	    Num_sent;
 
 static  int     To_exit = 0;
+char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
-static	char	username[11];
+static	char	username[LEN_USER + 1];
 
 //char* server_groups[] = { "servg0", "servg1", "servg2", "servg3", "servg4"};
 int curr_svr = -1;
@@ -37,7 +38,7 @@ static	int		Check_user();
 static void make_svr_grp(char *priv, char *grp); //make unique server group
 void connect_svr();
 void print_servers();
-
+void send_email();
 int main( int argc, char *argv[] )
 {
 	int	    ret;
@@ -80,11 +81,11 @@ int main( int argc, char *argv[] )
 static	void	User_command()
 {
 	char	command[130];
-	char	mess[MAX_MESSLEN];
+	//char	mess[MAX_MESSLEN];
 //	char	group[80];
-	char	groups[10][MAX_GROUP_NAME];
-	int	num_groups;
-	unsigned int	mess_len;
+	//char	groups[10][MAX_GROUP_NAME];
+	//int	num_groups;
+	//unsigned int	mess_len;
 	int	ret;
 	int	i;
 	int new_svr;
@@ -133,29 +134,8 @@ SP_leave ( Mbox, server_list[targ_svr]);
 		case 'm':
 			if (!Check_user()) break;
 			//implement m
-			num_groups = sscanf(&command[2], "%s%s%s%s%s%s%s%s%s%s",
-					groups[0], groups[1], groups[2], groups[3], groups[4],
-					groups[5], groups[6], groups[7], groups[8], groups[9] );
-			if( num_groups < 1 )
-			{
-				printf(" invalid group \n");
-				break;
-			}
-			printf("enter message: ");
-			mess_len = 0;
-			while ( mess_len < MAX_MESSLEN) {
-				if (fgets(&mess[mess_len], 200, stdin) == NULL)
-					Bye();
-				if (mess[mess_len] == '\n')
-					break;
-				mess_len += strlen( &mess[mess_len] );
-			}
-			ret= SP_multigroup_multicast( Mbox, SAFE_MESS, num_groups, (const char (*)[MAX_GROUP_NAME]) groups, 1, mess_len, mess );
-			if( ret < 0 )
-			{
-				SP_error( ret );
-				Bye();
-			}
+			send_email();
+
 			Num_sent++;
 
 			Print_menu();
@@ -411,7 +391,7 @@ static  void	Bye()
 static	int		Check_user(){
 	char	uname[5] = "User";
 	int		ret = 1;
-	if (strncmp(uname, username, 5))
+	if (!strncmp(uname, username, 5))
 	{
 		ret= 0;
 		printf("Change username before performing this function.\n");
@@ -481,6 +461,94 @@ msg_type = REQ_LEV;
 void print_servers()
 {
 
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//Send an email.
+/////////////////////////////////////////////////////////////////////////////
+void send_email()
+{
+	char to_user[LEN_USER];
+	char subject[LEN_SUB];
+	char email[LEN_MSG];
+	//int total_length = 0;
+	int msg_type = REQ_SEND;
+	int mess_len;
+	char msg[LEN_TOT];
+	int ret;
+
+	printf("\nto: ");
+	mess_len = 0;
+	while ( mess_len < LEN_USER) {
+		if (fgets(&to_user[mess_len], LEN_USER, stdin) == NULL)
+			Bye();
+		if (to_user[mess_len] == '\n')
+		{
+			if (mess_len == 0)
+			{
+				printf("This field cannot be blank\n");
+				printf("\nto: ");
+				continue;
+			}
+			break;
+		}
+		mess_len += strlen( &to_user[mess_len] );
+	}
+
+	printf("\nsubject: ");
+	mess_len = 0;
+	while ( mess_len < LEN_SUB) {
+		if (fgets(&subject[mess_len], LEN_SUB, stdin) == NULL)
+			Bye();
+		if (subject[mess_len] == '\n')
+		{
+			if (mess_len == 0)
+			{
+				printf("This field cannot be blank\n");
+				printf("\nsubject: ");
+				continue;
+			}
+			break;
+		}
+		mess_len += strlen( &subject[mess_len] );
+	}
+
+	printf("\nemail: ");
+	mess_len = 0;
+	while ( mess_len < LEN_MSG) {
+		if (fgets(&email[mess_len], LEN_MSG, stdin) == NULL)
+			Bye();
+		if (email[mess_len] == '\n')
+		{
+			if (mess_len == 0)
+			{
+				printf("This field cannot be blank\n");
+				printf("\nemail: ");
+				continue;
+			}
+			break;
+		}
+		mess_len += strlen( &email[mess_len] );
+	}
+
+	int runner = 0;
+	memcpy(msg, &msg_type, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, to_user,LEN_USER);
+	runner += LEN_USER;
+	memcpy(msg+runner, username,LEN_USER);
+	runner += LEN_USER;
+	memcpy(msg+runner, subject, LEN_SUB);
+	runner += LEN_SUB;
+	memcpy(msg+runner, email, LEN_MSG);
+	runner += LEN_MSG;
+
+	ret= SP_multicast( Mbox, SAFE_MESS, server_list[curr_svr], 1, LEN_TOT, msg );
+	if( ret < 0 )
+	{
+		SP_error( ret );
+		Bye();
+	}
 }
 ////////////////////////////////////////////////////////////////////////////////
 //
