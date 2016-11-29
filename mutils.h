@@ -94,12 +94,14 @@ struct head_list *next_head;
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct user_list {
 char user_name[LEN_USER];
-struct email_list *next_email;
+struct email_list *head_email;
+struct email_list *tail_email;
 	struct user_list *next_user;
 } user_list;
 
 //Define functions to work with structs.
 void add_message(int msg_id, int rec_svr, char* buffer, user_list* head);
+void del_message(int msg_id, int rec_svr, char* user_name, user_list* head);
 
 ////////////////////////////////////////////////////////////////////////////////
 //

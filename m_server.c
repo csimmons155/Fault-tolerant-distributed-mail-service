@@ -406,14 +406,14 @@ void process_message(char* msg)
 			strcpy(join_grp , msg+sizeof(int));
 			SP_join ( Mbox, join_grp);
 			break;
-case REQ_LEV:
+		case REQ_LEV:
 			strcpy(join_grp , msg+sizeof(int));
 			SP_leave ( Mbox, join_grp);
 			break;
 		case REQ_SEND:
 			mid++;
-add_message(mid, server_id, msg, head_user);
-						break;
+			add_message(mid, server_id, msg+sizeof(int), head_user);
+			break;
 		default:
 			printf("\nUnknown command received.\n");
 			break;

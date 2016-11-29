@@ -18,24 +18,34 @@ void get_user_box(user_list* user , char* to_user, user_list* head);
 ///////////////////////////////////////////////////////////////////////////////
 void add_message(int msg_id, int rec_svr, char* buffer, user_list* head)
 {
-	char to_user[LEN_USER];
-	char from_user[LEN_USER];
-	char subject[LEN_SUB];
-	char email[LEN_MSG];
-	int total_length = sizeof(int);
-//get all of the required strings.
-	strncpy(to_user, buffer+total_length, LEN_USER);
+	int total_length = 0;
+	email_list* email = malloc(sizeof(email_list));
+	//get all of the required strings.
+	strncpy(email->to_name, buffer+total_length, LEN_USER);
 	total_length += LEN_USER;
-	strncpy(from_user, buffer+total_length, LEN_USER);
+	strncpy(email->from_name, buffer+total_length, LEN_USER);
 	total_length += LEN_USER;
-	strncpy(subject, buffer+total_length, LEN_SUB);
+	strncpy(email->subject, buffer+total_length, LEN_SUB);
 	total_length += LEN_SUB;
-	strncpy(email, buffer+total_length, LEN_MSG);
+	strncpy(email->msg, buffer+total_length, LEN_MSG);
+	email->read = 0;
+	email->rec_svr = rec_svr;
+	email->msg_id = msg_id;
+	//printf("got a message:\n\nto: %s\nfrom: %s\nsubject: %s\nmsg: %s\n", to_user, from_user, subject, email);
 
-	printf("got a message:\n\nto: %s\nfrom: %s\nsubject: %s\nmsg: %s\n", to_user, from_user, subject, email);
+	user_list* user = NULL;
+	get_user_box(user, email->to_name, head);
+	printf("made it here");
+	fflush(stdout);
 
-user_list* user = NULL;
-get_user_box(user, to_user, head);
+	if (user->tail_email == NULL)
+	{
+		user->tail_email = email;
+	}else
+	{
+		user->tail_email->next_email = email;
+		user->tail_email = email;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -56,13 +66,60 @@ void get_user_box(user_list* user , char* to_user, user_list* head)
 			temp = temp->next_user;
 		}
 	}
+	printf("made it here");
+	fflush(stdout);
+
 	user = malloc(sizeof(user_list));
-strcpy(user->user_name,to_user);
-user->next_email = NULL;
-user->next_user = head;
-head = user;
+	strcpy(user->user_name,to_user);
+	user->head_email = NULL;
+	user->tail_email = NULL;
+	user->next_user = head;
+	head = user;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+//Search for message in user's box.  If it exists remove it.
+//If it doesn't exist then continue.
+/////////////////////////////////////////////////////////////////////////////
+void del_message(int msg_id, int rec_svr, char* user_name, user_list* head)
+{
+	user_list* temp = head;
+	while (temp != NULL)
+	{
+		if (!strcmp(temp->user_name, user_name))
+		{
+			break;
+		}else
+		{
+			temp = temp->next_user;
+		}
+	}
+	if (temp != NULL)
+	{
+		printf("user's box was not found\n");
+		return;
+	}
+
+	email_list* temp_email = temp->head_email;
+	email_list* prev_email = NULL;
+	while(temp_email != NULL)
+	{
+		if (temp_email->msg_id == msg_id)
+		{
+			if (temp_email->rec_svr == rec_svr)
+			{
+				if(prev_email == NULL)
+				{
+					temp->head_email = temp_email->next_email;
+					free(temp_email);
+				}else
+				{
+
+				}
+			}
+		}
+	}
+}
 /*
 ///////////////////////////////////////////////////////////////////////
 //receive start message.  No timeout, reliable receive, print wait status.
