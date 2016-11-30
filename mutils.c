@@ -11,12 +11,33 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "mutils.h"
 
-void get_user_box(user_list* user , char* to_user, user_list* head);
+user_list* head_user = NULL;
+//void get_user_box(user_list* user , char* to_user, user_list* head);
+static  void	Bye(mailbox Mbox);
 
+////////////////////////////////////////////////////////////////
+//Print all messages
+///////////////////////////////////////////////////////////////
+void print_msgs()
+{
+	user_list* temp = head_user;
+	email_list* temp_email;
+	while(temp != NULL)
+	{
+		printf("user is %s\n", temp->user_name);
+		temp_email = temp->head_email;
+		while(temp_email != NULL)
+		{
+			printf("subject is %s.\n", temp_email->subject);
+			temp_email = temp_email->next_email;
+		}
+		temp = temp->next_user;
+	}
+}
 ////////////////////////////////////////////////////////////////////////////////
 //add received message to the mailbox.
 ///////////////////////////////////////////////////////////////////////////////
-void add_message(int msg_id, int rec_svr, char* buffer, user_list* head)
+void add_message(int msg_id, int rec_svr, char* buffer)
 {
 	int total_length = 0;
 	email_list* email = malloc(sizeof(email_list));
@@ -31,59 +52,193 @@ void add_message(int msg_id, int rec_svr, char* buffer, user_list* head)
 	email->read = 0;
 	email->rec_svr = rec_svr;
 	email->msg_id = msg_id;
-	//printf("got a message:\n\nto: %s\nfrom: %s\nsubject: %s\nmsg: %s\n", to_user, from_user, subject, email);
 
-	user_list* user = NULL;
-	get_user_box(user, email->to_name, head);
-	printf("made it here");
-	fflush(stdout);
-
-	if (user->tail_email == NULL)
+	user_list* temp = head_user;
+	while (temp != NULL)
 	{
-		user->tail_email = email;
+		if (!strcmp(temp->user_name, email->to_name))
+		{
+			break;
+		}else
+		{
+			temp = temp->next_user;
+		}
+	}
+
+	if(temp == NULL)
+	{
+		temp = malloc(sizeof(user_list));
+		strncpy(temp->user_name,email->to_name, LEN_USER);
+		temp->head_email = NULL;
+		temp->tail_email = NULL;
+		temp->next_user = head_user;
+		head_user = temp;
+	}
+	if (temp->tail_email == NULL)
+	{
+		temp->tail_email = email;
+		temp->head_email = email;
 	}else
 	{
-		user->tail_email->next_email = email;
-		user->tail_email = email;
+		temp->tail_email->next_email = email;
+		temp->tail_email = email;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////
+//Send header to user
+///////////////////////////////////////////////////////////////////////////
+void send_header(mailbox Mbox, char* buffer)
+{
+	char username[LEN_USER];
+	char group_name[MAX_GROUP_NAME];
+	int total_length = 0;
+	int msg_type;
+	int transfer_to_msg;
+	char msg[MAX_MSG];
+	int tot_sub = 0;
+	int sub_for_pack;
+	email_list* e_list;
+	int tot_msg = 0;
+	int ret;
+	//get all of the required strings.
+	strncpy(username, buffer+total_length, LEN_USER);
+	total_length += LEN_USER;
+	strncpy(group_name, buffer+total_length, MAX_GROUP_NAME);
+	printf("sending %s's list to %s group.\n", username, group_name);
+
+	user_list* temp = head_user;
+	while(temp != NULL)
+	{
+		printf("comparing %s and %s, size is %d vs %d.\n", temp->user_name, username, strlen(temp->user_name), strlen(username));
+		if (!strncmp(temp->user_name, username, LEN_USER))
+		{
+			break;
+		}else
+		{
+			temp = temp->next_user;
+		}
+	}
+
+	if (temp == NULL)
+	{
+		printf("user %s not found.\n", username);
+
+		msg_type = SEND_NOHD;
+		memcpy(msg, &msg_type, sizeof(int));
+
+		ret= SP_multicast( Mbox, SAFE_MESS, group_name, 1, sizeof(int), msg );
+		if( ret < 0 )
+		{
+			SP_error( ret );
+			Bye(Mbox);
+		}
+	}else
+	{
+		e_list = temp->head_email;
+		while(e_list != NULL)
+		{
+			tot_sub++;
+			e_list = e_list->next_email;
+		}
+		if (tot_sub%SUB_PER == 0)
+		{
+			tot_msg = tot_sub/SUB_PER;
+		}else
+		{
+			tot_msg = tot_sub/SUB_PER + 1;
+		}
+		msg_type = SEND_HEAD;
+		memcpy(msg, &msg_type, sizeof(int));
+		e_list = temp->head_email;
+
+		for (int q = 0; q < tot_msg; q++)
+		{
+			total_length = sizeof(int);
+			if (tot_sub >= SUB_PER)
+			{
+				sub_for_pack = SUB_PER;
+				tot_sub = tot_sub - SUB_PER;
+			}else
+			{
+				sub_for_pack = tot_sub;
+			}
+			memcpy(msg+total_length, &sub_for_pack, sizeof(int));
+			total_length += sizeof(int);
+			for (int m = 0; m < sub_for_pack; m++)
+			{
+				transfer_to_msg = e_list->read;
+				memcpy(msg+total_length,&transfer_to_msg, sizeof(int));
+				total_length += sizeof(int);
+				transfer_to_msg = e_list->rec_svr;
+				memcpy(msg+total_length,&transfer_to_msg, sizeof(int));
+				total_length += sizeof(int);
+				transfer_to_msg = e_list->msg_id;
+				memcpy(msg+total_length,&transfer_to_msg, sizeof(int));
+				total_length += sizeof(int);
+				strncpy(msg+total_length, e_list->from_name, LEN_USER);
+				total_length += LEN_USER;
+				strncpy(msg+total_length, e_list->subject, LEN_SUB);
+				total_length += LEN_SUB;
+			}
+			ret= SP_multicast( Mbox, SAFE_MESS, group_name, 1, total_length, msg );
+			if( ret < 0 )
+			{
+				SP_error( ret );
+				Bye(Mbox);
+			}
+		}
+	}
+}
+
+static  void	Bye(mailbox Mbox)
+{
+
+	printf("\nBye.\n");
+
+	SP_disconnect( Mbox );
+
+	exit( 0 );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 //search for to_user's mailbox.  if doesn't exist make it.  mailbox
 //address.
 /////////////////////////////////////////////////////////////////////////////
-void get_user_box(user_list* user , char* to_user, user_list* head)
-{
-	user_list* temp = head;
-	while (temp != NULL)
-	{
-		if (!strcmp(temp->user_name, to_user))
-		{
-			user = temp;
-			return;
-		}else
-		{
-			temp = temp->next_user;
-		}
-	}
-	printf("made it here");
-	fflush(stdout);
+/*void get_user_box(user_list* user , char* to_user, user_list* head)
+  {
+  user_list* temp = head;
+  while (temp != NULL)
+  {
+  if (!strcmp(temp->user_name, to_user))
+  {
+  user = temp;
+  return;
+  }else
+  {
+  temp = temp->next_user;
+  }
+  }
+  temp = malloc(sizeof(user_list));
+  strncpy(temp->user_name,to_user, LEN_USER);
+  temp->head_email = NULL;
+  temp->tail_email = NULL;
+  temp->next_user = head;
+  head = temp;
+  user = temp;
+  printf("the user name is %s.\n", temp->user_name);
+  printf("the user name is %s.\n", head->user_name);
+  printf("the user name is %s.\n",user->user_name);
 
-	user = malloc(sizeof(user_list));
-	strcpy(user->user_name,to_user);
-	user->head_email = NULL;
-	user->tail_email = NULL;
-	user->next_user = head;
-	head = user;
-}
-
+  }
+  */
 //////////////////////////////////////////////////////////////////////////////
 //Search for message in user's box.  If it exists remove it.
 //If it doesn't exist then continue.
 /////////////////////////////////////////////////////////////////////////////
-void del_message(int msg_id, int rec_svr, char* user_name, user_list* head)
+void del_message(int msg_id, int rec_svr, char* user_name)
 {
-	user_list* temp = head;
+	user_list* temp = head_user;
 	while (temp != NULL)
 	{
 		if (!strcmp(temp->user_name, user_name))

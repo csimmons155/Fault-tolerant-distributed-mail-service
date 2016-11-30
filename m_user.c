@@ -39,6 +39,8 @@ static void make_svr_grp(char *priv, char *grp); //make unique server group
 void connect_svr();
 void print_servers();
 void send_email();
+void request_list();
+
 int main( int argc, char *argv[] )
 {
 	int	    ret;
@@ -57,8 +59,8 @@ int main( int argc, char *argv[] )
 		Bye();
 	}
 
-// just for testing.  Delete.
-//	printf("User: connected to %s with private group %s\n", Spread_name, Private_group );
+	// just for testing.  Delete.
+	//	printf("User: connected to %s with private group %s\n", Spread_name, Private_group );
 
 	//Create unique server connection group and join the group.
 	make_svr_grp(Private_group, join_svr_grp);
@@ -82,7 +84,7 @@ static	void	User_command()
 {
 	char	command[130];
 	//char	mess[MAX_MESSLEN];
-//	char	group[80];
+	//	char	group[80];
 	//char	groups[10][MAX_GROUP_NAME];
 	//int	num_groups;
 	//unsigned int	mess_len;
@@ -123,11 +125,12 @@ static	void	User_command()
 			targ_svr = new_svr;
 			//connect_svr();
 			SP_join ( Mbox, server_list[targ_svr]);
-SP_leave ( Mbox, server_list[targ_svr]);
+			SP_leave ( Mbox, server_list[targ_svr]);
 			break;
 
 		case 'l':
 			if (!Check_user()) break;
+			request_list();
 			Print_menu();
 			break;
 
@@ -155,7 +158,7 @@ SP_leave ( Mbox, server_list[targ_svr]);
 			break;
 
 		case 'v':
-		print_servers();
+			print_servers();
 			Print_menu();
 			break;
 
@@ -284,7 +287,7 @@ static	void	Read_message()
 						}
 						if (i == num_groups -1)
 						{
-						printf("Unable to connect to server %d.\n", targ_svr + 1);
+							printf("Unable to connect to server %d.\n", targ_svr + 1);
 						}
 					}
 				}
@@ -306,7 +309,7 @@ static	void	Read_message()
 				////////////////////////////////////////////////////////////
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 			}else if( Is_caused_disconnect_mess( service_type ) ){
-//added for server connect.///////////////////////////////////
+				//added for server connect.///////////////////////////////////
 				if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
 				{
 					if (num_groups == 1)
@@ -322,7 +325,7 @@ static	void	Read_message()
 
 				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
 			}else if( Is_caused_network_mess( service_type ) ){
-//added for server connect.///////////////////////////////////
+				//added for server connect.///////////////////////////////////
 				if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
 				{
 					if (num_groups == 1)
@@ -416,7 +419,7 @@ static void make_svr_grp(char *priv, char *grp)
 	strcpy(grp, priv);
 	grp[0] = 's';
 	grp[8] = 's';
-grp[9] = 's';
+	grp[9] = 's';
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -442,18 +445,18 @@ void connect_svr()
 
 	SP_multigroup_multicast( Mbox, CAUSAL_MESS, num_groups, (const char (*)[MAX_GROUP_NAME]) groups, 1, MAX_GROUP_NAME + sizeof(int), mess );
 
-if (curr_svr != -1){
-msg_type = REQ_LEV;
-	strcpy(groups, server_list[svr_num] );
-	memcpy(mess, &msg_type, sizeof(int));
-	strcpy(mess+sizeof(int), join_svr_grp);
+	if (curr_svr != -1){
+		msg_type = REQ_LEV;
+		strcpy(groups, server_list[svr_num] );
+		memcpy(mess, &msg_type, sizeof(int));
+		strcpy(mess+sizeof(int), join_svr_grp);
 
-	SP_multigroup_multicast( Mbox, CAUSAL_MESS, num_groups, (const char (*)[MAX_GROUP_NAME]) groups, 1, MAX_GROUP_NAME + sizeof(int), mess );
-}
+		SP_multigroup_multicast( Mbox, CAUSAL_MESS, num_groups, (const char (*)[MAX_GROUP_NAME]) groups, 1, MAX_GROUP_NAME + sizeof(int), mess );
+	}
 
 	curr_svr = targ_svr;
 	targ_svr = -1;
-	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //Print servers in current group.
@@ -479,57 +482,47 @@ void send_email()
 
 	printf("\nto: ");
 	mess_len = 0;
-	while ( mess_len < LEN_USER) {
+	while(mess_len == 0)
+	{
 		if (fgets(&to_user[mess_len], LEN_USER, stdin) == NULL)
 			Bye();
-		if (to_user[mess_len] == '\n')
-		{
-			if (mess_len == 0)
-			{
-				printf("This field cannot be blank\n");
-				printf("\nto: ");
-				continue;
-			}
-			break;
-		}
+
 		mess_len += strlen( &to_user[mess_len] );
+		if (mess_len == 0)
+		{
+			printf("This field cannot be blank\n");
+			printf("\nto: ");
+		}
 	}
+to_user[mess_len-1] = 0;
 
 	printf("\nsubject: ");
 	mess_len = 0;
-	while ( mess_len < LEN_SUB) {
+	while ( mess_len == 0) {
 		if (fgets(&subject[mess_len], LEN_SUB, stdin) == NULL)
 			Bye();
-		if (subject[mess_len] == '\n')
-		{
-			if (mess_len == 0)
-			{
-				printf("This field cannot be blank\n");
-				printf("\nsubject: ");
-				continue;
-			}
-			break;
-		}
 		mess_len += strlen( &subject[mess_len] );
+		if (mess_len == 0)
+		{
+			printf("This field cannot be blank\n");
+			printf("\nsubject: ");
+		}
 	}
+	subject[mess_len-1] = 0;
 
 	printf("\nemail: ");
 	mess_len = 0;
-	while ( mess_len < LEN_MSG) {
+	while ( mess_len == 0) {
 		if (fgets(&email[mess_len], LEN_MSG, stdin) == NULL)
 			Bye();
-		if (email[mess_len] == '\n')
-		{
-			if (mess_len == 0)
-			{
-				printf("This field cannot be blank\n");
-				printf("\nemail: ");
-				continue;
-			}
-			break;
-		}
 		mess_len += strlen( &email[mess_len] );
+		if (mess_len == 0)
+		{
+			printf("This field cannot be blank\n");
+			printf("\nemail: ");
+		}
 	}
+	email[mess_len-1]= 0;
 
 	int runner = 0;
 	memcpy(msg, &msg_type, sizeof(int));
@@ -550,6 +543,32 @@ void send_email()
 		Bye();
 	}
 }
+
+////////////////////////////////////////////////////////////////////////
+//Request a list of headers from the server.
+////////////////////////////////////////////////////////////////////////
+void request_list()
+{
+	int runner = 0;
+	int msg_type = REQ_HEAD ;
+	int ret;
+	char msg[sizeof(int) + LEN_USER + MAX_GROUP_NAME];
+
+	memcpy(msg, &msg_type, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, username,LEN_USER);
+	runner += LEN_USER;
+	strcpy(msg+runner, Private_group);
+	runner += MAX_GROUP_NAME;
+
+	ret= SP_multicast( Mbox, SAFE_MESS, server_list[curr_svr], 1, runner, msg );
+	if( ret < 0 )
+	{
+		SP_error( ret );
+		Bye();
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History

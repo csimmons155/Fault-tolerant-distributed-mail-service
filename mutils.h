@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <setjmp.h>
+#include "sp.h"
 
 //header type defs, from client
 #define	REQ_DEL 	2
@@ -35,6 +36,7 @@
 
 //header type defs, to client
 #define SEND_HEAD	5
+#define SEND_NOHD	11
 #define SEND_MSG	6
 #define SEND_MEM	1
 
@@ -43,7 +45,8 @@
 #define	LEN_SUB		80
 #define LEN_MSG		1000
 #define LEN_TOT		1104
-
+#define MAX_MSG		1400
+#define SUB_PER		13
 //server group names, defined to prevent FFing.
 #define BS1			"BS1"
 #define BS2			"BS2"
@@ -100,8 +103,10 @@ struct email_list *tail_email;
 } user_list;
 
 //Define functions to work with structs.
-void add_message(int msg_id, int rec_svr, char* buffer, user_list* head);
-void del_message(int msg_id, int rec_svr, char* user_name, user_list* head);
+void add_message(int msg_id, int rec_svr, char* buffer);
+void del_message(int msg_id, int rec_svr, char* user_name);
+void print_msgs();
+void send_header(mailbox Mbox, char* buffer);
 
 ////////////////////////////////////////////////////////////////////////////////
 //

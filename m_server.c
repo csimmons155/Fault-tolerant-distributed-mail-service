@@ -23,7 +23,7 @@ int 			total_rec = 0;
 int				mid = 0;
 static  int     To_exit = 0;
 static 	FILE 	*fw;
-user_list*		head_user = NULL;
+//user_list*		head_user = NULL;
 int		server_id;
 char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
@@ -412,7 +412,21 @@ void process_message(char* msg)
 			break;
 		case REQ_SEND:
 			mid++;
-			add_message(mid, server_id, msg+sizeof(int), head_user);
+			/*if (head_user == NULL)
+			  {
+			  head_user = malloc(sizeof(user_list));
+			  strncpy(head_user->user_name, msg+sizeof(int), LEN_USER);
+			  head_user->head_email = NULL;
+			  head_user->tail_email = NULL;
+			  head_user->next_user = NULL;
+			  }*/
+			add_message(mid, server_id, msg+sizeof(int));
+			print_msgs();
+			//printf("this is the subject %s.\n", head_user->head_email->subject);
+			break;
+
+		case REQ_HEAD:
+			send_header(Mbox, msg+sizeof(int));
 			break;
 		default:
 			printf("\nUnknown command received.\n");
