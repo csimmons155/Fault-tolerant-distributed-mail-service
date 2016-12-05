@@ -30,6 +30,15 @@ static	char	username[LEN_USER + 1];
 int curr_svr = -1;
 int targ_svr = -1;
 
+//Following variables are used to track subject list packets
+int tot_exp = 0;//total number of packets expected for list.
+int tot_rec = 0;//number of packets received for list.
+int tot_subs = 0;//total number of subs received.
+head_list* subs = NULL;//Used to store list of subjects to display.
+int displaying = 0;//first sub being displayed.
+
+int user_mode = 1;//user mode one is normal, usermode 2 means in list mode.
+
 static	void	Print_menu();
 static	void	User_command();
 static  void	Bye();
@@ -40,6 +49,13 @@ void connect_svr();
 void print_servers();
 void send_email();
 void request_list();
+void norm_rec(char* msg);
+void process_headers(char* msg);
+void show_header();
+void free_emails();
+void delete_email(int email_num);
+void req_email(int email_num);
+void display_msg();
 
 int main( int argc, char *argv[] )
 {
@@ -91,88 +107,179 @@ static	void	User_command()
 	int	ret;
 	int	i;
 	int new_svr;
+	int tar_email;
+	int curr_view;
 
-	for( i=0; i < sizeof(command); i++ ) command[i] = 0;
-	if( fgets( command, 130, stdin ) == NULL )
-	{
-		printf("Unrecognized user command.  Please make your selection again.\n");
-		Print_menu();
-		return;
-	}
-
-	switch( command[0] )
-	{
-		case 'u'://to login
-			ret = sscanf( &command[2], "%10s", username);
-			if( ret < 1 )
-			{
-				printf(" invalid username.\n");
-				printf("\n%s> ", username);
-				break;
-			}
+	if (user_mode == 1){
+		for( i=0; i < sizeof(command); i++ ) command[i] = 0;
+		if( fgets( command, 130, stdin ) == NULL )
+		{
+			printf("\n\n\n\n\nUnrecognized user command.  Please make your selection again.\n");
 			Print_menu();
-			break;
+			return;
+		}
 
-		case 'c': //connect to server
-			ret = sscanf( &command[2], "%d", &new_svr);
-			new_svr--;//change to index instead of user readable.
-			if( ret < 1 || new_svr > 4 || new_svr < 0)
-			{
-				printf(" invalid server number.  Choose from 1 to 5..\n");
+		switch( command[0] )
+		{
+			case 'u'://to login
+				ret = sscanf( &command[2], "%10s", username);
+				if( ret < 1 )
+				{
+					printf("\n\n\n\n\n\n\n\ninvalid username.\n");
+					Print_menu();
+					break;
+				}
 				Print_menu();
 				break;
-			}
-			targ_svr = new_svr;
-			//connect_svr();
-			SP_join ( Mbox, server_list[targ_svr]);
-			SP_leave ( Mbox, server_list[targ_svr]);
-			break;
 
-		case 'l':
-			if (!Check_user()) break;
-			request_list();
+			case 'c': //connect to server
+				ret = sscanf( &command[2], "%d", &new_svr);
+				new_svr--;//change to index instead of user readable.
+				if( ret < 1 || new_svr > 4 || new_svr < 0)
+				{
+					printf("\n\n\n\n\n\n\n\ninvalid server number.  Choose from 1 to 5..\n");
+					Print_menu();
+					break;
+				}
+				targ_svr = new_svr;
+				//connect_svr();
+				SP_join ( Mbox, server_list[targ_svr]);
+				SP_leave ( Mbox, server_list[targ_svr]);
+				break;
+
+			case 'l':
+				if (!Check_user()) break;
+				request_list();
+				Print_menu();
+				break;
+
+			case 'm':
+				if (!Check_user()) break;
+				//implement m
+				send_email();
+
+				Num_sent++;
+
+				Print_menu();
+				break;
+
+			case 'v':
+				print_servers();
+				Print_menu();
+				break;
+
+			case 'q':
+				Bye();
+				break;
+
+			default:
+
+				printf("\0333[2J");
+				printf("Unknown commnad8\n");
+				Print_menu();
+				break;
+		}
+	}else if (user_mode == 2){
+		for( i=0; i < sizeof(command); i++ ) command[i] = 0;
+		if( fgets( command, 130, stdin ) == NULL )
+		{
+			printf("\n\n\n\n\n\n\n\nUnrecognized user command.  Please make your selection again.\n");
 			Print_menu();
-			break;
+			return;
+		}
 
-		case 'm':
-			if (!Check_user()) break;
-			//implement m
-			send_email();
+		switch( command[0] )
+		{
+			case 'r'://display message
+				ret = sscanf( &command[2], "%d", &tar_email);
 
-			Num_sent++;
+				curr_view = tot_subs - (displaying)*MAX_DIS;
 
-			Print_menu();
-			break;
+				if(curr_view > MAX_DIS)
+				{
+					curr_view = MAX_DIS;
+				}
 
-		case 'd':
-			if (!Check_user()) break;
-			//implement d
-			Print_menu();
-			break;
+				if (tar_email < 1 || tar_email > curr_view)
+				{
+					printf("\n\n\n\n\n\n\n\nvalue selected unavailable.  Please choose a correct value: 1:%d.", curr_view);
+					show_header();
 
-		case 'r':
-			if (!Check_user()) break;
+				}else
+				{
+					req_email(tar_email);
+				}
+				break;
 
-			//imp r
-			Print_menu();
-			break;
+			case 'd': //delete message
 
-		case 'v':
-			print_servers();
-			Print_menu();
-			break;
+				ret = sscanf( &command[2], "%d", &tar_email);
 
-		case 'q':
-			Bye();
-			break;
+				curr_view = tot_subs - (displaying)*MAX_DIS;
 
-		default:
-			printf("\nUnknown commnad\n");
-			Print_menu();
-			break;
+				if(curr_view > MAX_DIS)
+				{
+					curr_view = MAX_DIS;
+				}
+
+				if (tar_email < 1 || tar_email > curr_view)
+				{
+					printf("\n\n\n\n\n\n\n\nvalue selected unavailable.  Please choose a correct value: 1:%d.", curr_view);
+					printf("\n\n\n\n\n\n\n\nvalue selected unavailable.  Please choose a correct value: 1:%d.", curr_view);
+
+				}else
+				{
+					delete_email(tar_email);
+				}
+
+				break;
+
+			case 'n'://next 10 emails
+				if ((displaying+1)*MAX_DIS>=tot_subs){
+					printf("\n\n\n\n\n\n\n\nAlready at end of list");
+				}else
+				{
+					displaying++;
+				}
+				show_header();
+				break;
+
+			case 'p'://prev 10 emails
+				if(displaying == 0)
+				{
+					printf("\n\n\n\n\n\n\n\nAlready at beginning of list");
+				}else
+				{
+					displaying--;
+				}
+				show_header();
+
+				break;
+
+			case 'q'://go back to normal menu.
+				free_emails();
+				Print_menu();
+
+				break;
+
+			default:
+				printf("\0333[2J");
+				printf("\n\n\n\n\n\n\n\nUnknown commnad\n");
+				show_header();
+				break;
+		}
+	}else if (user_mode == 3)
+	{
+		getchar();
+		user_mode = 2;
+		free_emails();
+		request_list();
+	}else
+	{
+		printf("error - should never get here");
 	}
-}
 
+}
 static	void	Print_menu()
 {
 	printf("\n");
@@ -191,8 +298,6 @@ static	void	Print_menu()
 	printf("\tc <server index> -- connect to server\n");
 	printf("\tl  -- list messages\n");
 	printf("\tm -- follow prompts to send message\n");
-	printf("\td <list number> -- delete a message\n");
-	printf("\tr <list number> -- read a message (stuck) \n");
 	printf("\tv -- print server membership \n");
 	printf("\tq -- quit\n");
 
@@ -232,8 +337,7 @@ static	void	Read_message()
 		if ( (ret == GROUPS_TOO_SHORT) || (ret == BUFFER_TOO_SHORT) ) {
 			service_type = DROP_RECV;
 			printf("\n========Buffers or Groups too Short=======\n");
-			ret = SP_receive( Mbox, &service_type, sender, MAX_MEMBERS, &num_groups, target_groups,
-					&mess_type, &endian_mismatch, sizeof(mess), mess );
+			ret = SP_receive( Mbox, &service_type, sender, MAX_MEMBERS, &num_groups, target_groups,	&mess_type, &endian_mismatch, sizeof(mess), mess );
 		}
 	}
 	if (ret < 0 )
@@ -248,6 +352,11 @@ static	void	Read_message()
 	}
 	if( Is_regular_mess( service_type ) )
 	{
+		//////////////////////////////////////////////////////////
+		//added to handle rec email and rec list.
+		//////////////////////////////////////////////////////////
+		norm_rec(mess);
+		/////////////////////////////////////////////////////////
 		mess[ret] = 0;
 		if     ( Is_unreliable_mess( service_type ) ) printf("received UNRELIABLE ");
 		else if( Is_reliable_mess(   service_type ) ) printf("received RELIABLE ");
@@ -255,10 +364,10 @@ static	void	Read_message()
 		else if( Is_causal_mess(     service_type ) ) printf("received CAUSAL ");
 		else if( Is_agreed_mess(     service_type ) ) printf("received AGREED ");
 		else if( Is_safe_mess(       service_type ) ) printf("received SAFE ");
-		printf("message from %s, of type %d, (endian %d) to %d groups \n(%d bytes): %s\n",
-				sender, mess_type, endian_mismatch, num_groups, ret, mess );
+		printf("message from %s, of type %d, (endian %d) to %d groups \n(%d bytes): %s\n", sender, mess_type, endian_mismatch, num_groups, ret, mess );
 	}else if( Is_membership_mess( service_type ) )
 	{
+		free_emails();
 		ret = SP_get_memb_info( mess, service_type, &memb_info );
 		if (ret < 0) {
 			printf("BUG: membership message does not have valid body\n");
@@ -368,6 +477,7 @@ static	void	Read_message()
 		}else printf("received incorrecty membership message of type 0x%x\n", service_type );
 	} else if ( Is_reject_mess( service_type ) )
 	{
+		free_emails();
 		printf("REJECTED message from %s, of servicetype 0x%x messtype %d, (endian %d) to %d groups \n(%d bytes): %s\n",
 				sender, service_type, mess_type, endian_mismatch, num_groups, ret, mess );
 	}else printf("received message of unknown message type 0x%x with ret %d\n", service_type, ret);
@@ -394,6 +504,10 @@ static  void	Bye()
 static	int		Check_user(){
 	char	uname[5] = "User";
 	int		ret = 1;
+	if (!strncmp(uname, username, 5) || curr_svr == -1)
+	{
+		printf("\n\n\n\n\n\n\n\n");
+	}
 	if (!strncmp(uname, username, 5))
 	{
 		ret= 0;
@@ -479,50 +593,53 @@ void send_email()
 	int mess_len;
 	char msg[LEN_TOT];
 	int ret;
-
-	printf("\nto: ");
 	mess_len = 0;
+
 	while(mess_len == 0)
 	{
+		printf("\nto: ");
 		if (fgets(&to_user[mess_len], LEN_USER, stdin) == NULL)
 			Bye();
 
-		mess_len += strlen( &to_user[mess_len] );
+		mess_len = strlen(to_user) - 1;
 		if (mess_len == 0)
 		{
 			printf("This field cannot be blank\n");
-			printf("\nto: ");
+		}else
+		{
+			to_user[mess_len] = 0;
 		}
 	}
-to_user[mess_len-1] = 0;
 
-	printf("\nsubject: ");
 	mess_len = 0;
 	while ( mess_len == 0) {
+		printf("\nsubject: ");
 		if (fgets(&subject[mess_len], LEN_SUB, stdin) == NULL)
 			Bye();
-		mess_len += strlen( &subject[mess_len] );
+		mess_len = strlen(subject) -1;
 		if (mess_len == 0)
 		{
 			printf("This field cannot be blank\n");
-			printf("\nsubject: ");
+		}else
+		{
+			subject[mess_len]=0;
 		}
 	}
-	subject[mess_len-1] = 0;
 
-	printf("\nemail: ");
 	mess_len = 0;
 	while ( mess_len == 0) {
+		printf("\nemail: ");
 		if (fgets(&email[mess_len], LEN_MSG, stdin) == NULL)
 			Bye();
-		mess_len += strlen( &email[mess_len] );
+		mess_len = strlen(email) - 1;
 		if (mess_len == 0)
 		{
 			printf("This field cannot be blank\n");
-			printf("\nemail: ");
+		}else
+		{
+			email[mess_len] = 0;
 		}
 	}
-	email[mess_len-1]= 0;
 
 	int runner = 0;
 	memcpy(msg, &msg_type, sizeof(int));
@@ -567,6 +684,350 @@ void request_list()
 		SP_error( ret );
 		Bye();
 	}
+}
+
+/////////////////////////////////////////////////////////////////////////
+//Used to receive messages send directly to this client.  Should only be
+//message list, email, and server list; anything else should be ignored.
+//////////////////////////////////////////////////////////////////////////
+void norm_rec(char* msg)
+{
+	int msg_type = ((int*) msg)[0];
+	printf("message received of type %d", msg_type);
+
+	if (msg_type != SEND_HEAD && msg_type != SEND_MSG)
+	{
+		free_emails();
+	}
+	switch(msg_type)
+	{
+		case SEND_HEAD:
+			//This is a list of subjects.
+			process_headers(msg+sizeof(int));
+			break;
+		case SEND_NOHD:
+			//This is if there are no subjects on the server for the user.
+			printf("\n*******************\n");
+			printf("User, %s, has no emails to list.\n", username);
+			printf("\n*******************\n");
+			Print_menu();
+			break;
+		case SEND_MSG:
+
+			//this is to display a received email.
+			display_msg(msg+sizeof(int));
+			break;
+
+		case SEND_NOMSG:
+			printf("\n\n\n\n\n\n\n\n*******************\n");
+			printf("The email no longer exists.\n");
+			printf("\n*******************\n");
+			free_emails();
+			request_list();
+			break;
+		case SEND_MEM:
+			//this is to display the server list.
+			break;
+		default:
+			printf("\nUnknown command received12. type- %d\n",msg_type );
+			break;
+	}
+}
+
+//////////////////////////////////////////////////////////////////
+//process the list of sent email headers.
+//////////////////////////////////////////////////////////////////
+void process_headers(char* msg)
+{
+	int p_req = ((int*) msg)[0];
+	int p_num = ((int*) msg)[1];
+	int sub_num = ((int*) msg)[2];
+	int temp_read;
+	int temp_id;
+	int temp_svr;
+	int size_read = sizeof(int)*3;
+	printf("expecting %d subject packets", p_req);
+
+	///////////////////////////
+	//keep track across packets using global variables.
+	///////////////////////////
+	if (tot_rec != p_num){
+		printf("err- received unexpected packet of subjects1.\n");
+		free_emails();
+		return;
+	}
+	if (tot_rec > 0 && p_req != tot_exp)
+	{
+		printf("err- received unexpected packet of subjects2.\n");
+		free_emails();
+		return;
+	}
+	if (tot_rec == 0)
+	{
+		tot_exp = p_req;
+	}
+
+	tot_rec++;
+	///////////////////////////////////////////////
+
+	if (sub_num > SUB_PER)
+	{
+		sub_num = SUB_PER;
+	}
+	tot_subs += sub_num;
+	head_list* curr = NULL;
+	head_list* prev = NULL;
+
+	if (p_num == 0)//This is the first pack for this list.
+	{
+		subs = malloc(sizeof(head_list));
+		sub_num--;
+		//		subs->read = ((int*)msg+size_read)[0];
+		memcpy(&temp_read, msg+size_read, sizeof(int));
+		subs->read = temp_read;
+		size_read+=sizeof(int);
+		memcpy(&temp_svr, msg+size_read, sizeof(int));
+		subs->rec_svr = temp_svr;
+		//		subs->rec_svr = ((int*)msg+size_read)[0];
+		size_read+=sizeof(int);
+		//		subs->msg_id = ((int*)msg+size_read)[0];
+		memcpy(&temp_id, msg+size_read, sizeof(int));
+		subs->msg_id = temp_id;
+		size_read+=sizeof(int);
+		strncpy(subs->from_name, msg+size_read, LEN_USER);
+		size_read+=LEN_USER;
+		strncpy(subs->subject, msg+size_read, LEN_SUB);
+		size_read+=LEN_SUB;
+		subs->next_head = NULL;
+		prev = subs;
+	}else
+	{
+		if (subs == NULL)
+		{
+			printf("the header list is NULL, this should not happen.\n");
+			Bye();
+		}else
+			prev = subs;
+		while (prev->next_head != NULL)
+		{
+			prev = prev->next_head;
+		}
+	}
+	printf("the first email has %d, %d, %d\n",temp_read, temp_svr, temp_id);
+	for (int q = 0; q < sub_num; q++)
+	{
+		curr= malloc(sizeof(head_list));
+		memcpy(&temp_read, msg+size_read, sizeof(int));
+		curr->read = temp_read;
+		size_read+=sizeof(int);
+		memcpy(&temp_svr, msg+size_read, sizeof(int));
+		curr->rec_svr = temp_svr;
+		//		subs->rec_svr = ((int*)msg+size_read)[0];
+		size_read+=sizeof(int);
+		//		subs->msg_id = ((int*)msg+size_read)[0];
+		memcpy(&temp_id, msg+size_read, sizeof(int));
+		curr->msg_id = temp_id;
+		size_read+=sizeof(int);
+
+		//		curr->read = ((int*)msg+size_read)[0];
+		//		curr->rec_svr = ((int*)msg+size_read)[1];
+		//		curr->msg_id = ((int*)msg+size_read)[2];
+		//		size_read += sizeof(int)*3;
+		strncpy(curr->from_name, msg+size_read, LEN_USER);
+		size_read+=LEN_USER;
+		strncpy(curr->subject, msg+size_read, LEN_SUB);
+		size_read+=LEN_SUB;
+		curr->next_head = NULL;
+
+		prev->next_head = curr;
+		prev = curr;
+	}
+
+	if (tot_rec == tot_exp)
+	{
+		//make function  to handle list.
+		user_mode = 2;
+		show_header();
+		//clean up global variables.
+	}
+
+}
+
+//////////////////////////////////////////////////////////////////////
+//Show list of headers to user and get input.
+/////////////////////////////////////////////////////////////////////
+void show_header()
+{
+
+	int num_to_display;
+	head_list* curr = subs;
+
+	for(int n = 0; n < displaying*MAX_DIS ; n++)
+	{
+		curr = curr->next_head;
+	}
+
+	//determine how many emails to display.
+	num_to_display = tot_subs - (displaying*MAX_DIS);
+	if (num_to_display > MAX_DIS)
+	{
+		num_to_display = MAX_DIS;
+	}
+	/*
+	   while (curr != NULL){
+	   printf("%d\t%s\t%s\n", curr->read, curr->from_name, curr->subject);
+
+	   curr = curr->next_head;
+	   }
+	   */
+	printf("\n");
+	printf("==========\n");
+	printf("User Menu:\n");
+	printf("----------\n");
+	printf("connected to server %d.\n", curr_svr + 1);
+	printf("\n   U  From\tSubject\n");
+
+	for(int m = 0; m < num_to_display; m++)
+	{
+		if(!curr->read)
+		{
+			printf("%d. X  ", m+1);
+		}else
+		{
+			printf("%d.    ", m+1);
+		}
+		printf("%s\t%s\t%d\t%d\n", curr->from_name, curr->subject,curr->rec_svr, curr->msg_id );
+		curr = curr->next_head;
+	}
+	printf("\n");
+	printf("\td <list number> -- delete a message\n");
+	printf("\tr <list number> -- read a message\n");
+	printf("\tn -- display next 10 emails.\n");
+	printf("\tp -- display previous 10 emails.\n");
+	printf("\tq -- return to main menu.\n");
+
+	printf("\n%s> ", username);
+	fflush(stdout);
+}
+
+//////////////////////////////////////////////////////////////////////
+//Free memory for email list and set list variables to 0.
+///////////////////////////////////////////////////////////////////////
+void free_emails()
+{
+	tot_exp = 0;//total number of packets expected for list.
+	tot_rec = 0;//number of packets received for list.
+	tot_subs = 0;//total number of subs received.
+
+	head_list* curr = subs;
+
+	while (subs != NULL)
+	{
+		subs = subs->next_head;
+		free(curr);
+		curr = subs;
+	}
+	user_mode = 1;
+}
+
+/////////////////////////////////////////////////////////////////////////
+//loop through list, find email, send delete msg to server and receive list
+//again.
+//////////////////////////////////////////////////////////////////////////
+void delete_email(int email_num)
+{
+	head_list* curr = subs;
+	for(int n = 1; n < displaying*MAX_DIS+email_num ; n++)
+	{
+		curr = curr->next_head;
+	}
+	int runner = 0;
+	int rec_svr = curr->rec_svr;
+	int msg_id = curr->msg_id;
+	int msg_type = REQ_DEL ;
+	int ret;
+	char msg[MAX_MSG];
+
+	memcpy(msg+runner, &msg_type, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, &rec_svr, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, &msg_id, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, username,LEN_USER);
+	runner += LEN_USER;
+	memcpy(msg+runner, Private_group, MAX_GROUP_NAME);
+	runner += MAX_GROUP_NAME;
+	ret= SP_multicast( Mbox, SAFE_MESS, join_svr_grp, 1, runner, msg );
+	if( ret < 0 )
+	{
+		SP_error( ret );
+		Bye();
+	}
+	free_emails();
+}
+
+/////////////////////////////////////////////////////////////////////////
+//request email from server to display.
+////////////////////////////////////////////////////////////////////////
+void req_email(int email_num)
+{
+	head_list* curr = subs;
+	for(int n = 1; n < displaying*MAX_DIS+email_num ; n++)
+	{
+		curr = curr->next_head;
+	}
+	int runner = 0;
+	int rec_svr = curr->rec_svr;
+	int msg_id = curr->msg_id;
+	int msg_type = REQ_MSG ;
+	int ret;
+	char msg[MAX_MSG];
+
+	memcpy(msg+runner, &msg_type, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, &rec_svr, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, &msg_id, sizeof(int));
+	runner += sizeof(int);
+	memcpy(msg+runner, username,LEN_USER);
+	runner += LEN_USER;
+	memcpy(msg+runner, Private_group, MAX_GROUP_NAME);
+	runner += MAX_GROUP_NAME;
+	ret= SP_multicast( Mbox, SAFE_MESS, join_svr_grp, 1, runner, msg );
+	if( ret < 0 )
+	{
+		SP_error( ret );
+		Bye();
+	}
+	free_emails();
+}
+
+////////////////////////////////////////////////////////////
+//When a message is received this will display it to the screen.
+////////////////////////////////////////////////////////////
+void display_msg(char* msg)
+{
+	user_mode = 3;
+
+	char from_name[LEN_USER];
+	char subject[LEN_SUB];
+	char email[LEN_MSG];
+	int runner;
+
+	runner = 0;
+	memcpy(from_name, msg+runner, LEN_USER);
+	runner+=LEN_USER;
+	memcpy(subject, msg+runner, LEN_SUB);
+	runner+=LEN_SUB;
+	memcpy(email, msg+runner, LEN_MSG);
+	runner+=LEN_MSG;
+
+	printf("\n\n\n\n\n\n\n\n");
+	printf("From: %s\n", from_name);
+	printf("Subject: %s\n", subject);
+	printf("Message: %s\n", email);
+	printf("Press any key to continue\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////

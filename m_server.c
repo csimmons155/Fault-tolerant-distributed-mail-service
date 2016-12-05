@@ -20,7 +20,6 @@ char			join_grp[MAX_GROUP_NAME];//used in Process:REQ_JOIN, REQ_LEV
 static  mailbox Mbox;
 int 			num_in_group = 0;
 int 			total_rec = 0;
-int				mid = 0;
 static  int     To_exit = 0;
 static 	FILE 	*fw;
 //user_list*		head_user = NULL;
@@ -77,9 +76,9 @@ int main( int argc, char *argv[] )
 	{
 		Print_help();
 	}
-
+set_proc(server_id);
 	//before connecting to spread, read info from file to regain state.
-	//initFile(server_id);
+read_file();
 
 	//connect to spread.
 	sp_time test_timeout;
@@ -199,121 +198,10 @@ int main( int argc, char *argv[] )
 		fflush(stdout);
 	}
 
-	/*
-	//Wait for processes before starting.
-	while(num_in_group != num_of_processes)
-	{
-	num_in_group = start_proc();
-	}
-	//Start process
-	while (num_in_group != 0)
-	{
-	//even number processes send first
-	if (process_index%2 == 0){
-	if (num_of_messages >= num_sent)
-	{
-	for(int m = 0; m < MAX_MSG_SEND; m++)
-	{
-	if (num_of_messages >= num_sent)
-	{
-	num_sent++;
-	send_mess(num_sent, process_index, num_of_messages - num_sent);
-	}else
-	{
-	break;
-	}
-	}
-	}
-	rec_mess(MAX_MSG_SEND*num_in_group);
-//odd number processes receive first
-}else
-{
-rec_mess(MAX_MSG_SEND*num_in_group);
-if (num_of_messages >= num_sent)
-{
-for(int m = 0; m < MAX_MSG_SEND; m++)
-{
-if (num_of_messages >= num_sent)
-{
-num_sent++;
-send_mess(num_sent, process_index, num_of_messages - num_sent);
-}else
-{
-break;
-}
-}
+	Bye();
+	return( 0 );
 }
 
-}
-}
-*/
-Bye();
-return( 0 );
-}
-/*
-//////////////////////////////////////////////////////////////////////
-//Listen for join messages and return how many processes are in the group.
-/////////////////////////////////////////////////////////////////////
-int start_proc()
-{
-char		 mess[MAX_MESSLEN];
-char		 sender[MAX_GROUP_NAME];
-char		 target_groups[MAX_MEMBERS][MAX_GROUP_NAME];
-membership_info  memb_info;
-int			 num_groups;
-int			 service_type;
-int16		 mess_type;
-int			 endian_mismatch;
-
-service_type = 0;
-printf("getting member join messages\n");
-SP_receive( Mbox, &service_type, sender, 100, &num_groups, target_groups,
-&mess_type, &endian_mismatch, sizeof(mess), mess );
-if( Is_membership_mess( service_type ) )
-{
-SP_get_memb_info( mess, service_type, &memb_info );
-if     ( Is_reg_memb_mess( service_type ) )
-{
-return num_groups;
-}else
-{
-Bye();
-}
-}
-Bye();
-return 0;
-}
-
-//////////////////////////////////////////////////////////////////////////
-//Send a message as described in the exercise handout.
-/////////////////////////////////////////////////////////////////////////
-void send_mess(int mess_ind, int proc_ind, int num_to_send)
-{
-char	groups[MAX_GROUP_NAME];
-strcpy(groups, "Browne");
-int	num_groups=1;
-
-int mess[MSG_LEN];
-//int		 ret;
-
-mess[P_IDX] = proc_ind;
-mess[M_IDX] = mess_ind;
-mess[R_NUM] = rand() % 1000000 + 1;
-//if num_to_send less than 0 then let all processes know this processes is
-//complete
-if (num_to_send < 0)
-{
-mess[3] = 0;
-} else
-{
-//normal message, more messages to follow.
-mess[3] = 1;
-}
-
-SP_multigroup_multicast( Mbox, CAUSAL_MESS, num_groups, (const char (*)[MAX_GROUP_NAME]) groups, 1, MSG_LEN * sizeof(int), (char *)mess );
-//printf("sent the message\n");
-}
-*/
 //////////////////////////////////////////////////////////////////////////
 //Print the usage message.
 /////////////////////////////////////////////////////////////////////////
@@ -336,61 +224,6 @@ void	Bye()
 
 	exit( 0 );
 }
-/*
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//Receive a message and print contents to file.
-/////////////////////////////////////////////////////////////////////////////////
-void rec_mess(int num_to_rec)
-{
-int	num_groups;
-
-int mess[MSG_LEN];
-char		 sender[MAX_GROUP_NAME];
-char		 target_groups[MAX_MEMBERS][MAX_GROUP_NAME];
-int		 service_type =0;
-int16		 mess_type;
-int		 endian_mismatch;
-//int		 ret;
-
-for (int i = 0; i < num_to_rec; i++)
-{
-SP_receive( Mbox, &service_type, sender, 100, &num_groups, target_groups,
-&mess_type, &endian_mismatch, MSG_LEN*sizeof(int), (char *)mess );
-if( Is_regular_mess( service_type ) )
-{
-//	printf("received the right type of message, type %d.\n", service_type);
-if (mess[3] == 0)
-{
-//A process finished.  Reduce number of sending processes.
-num_in_group--;
-return;
-}else
-{
-fprintf(fw, "%2d, %8d, %8d\n", mess[P_IDX], mess[M_IDX], mess[R_NUM]);
-total_rec++;
-}
-}else
-{
-printf("received a non routine message of type: %d.\n", service_type);
-i--;
-}
-}
-}
-
-///////////////////////////////////////////////////////////////////////////
-//Open the file to write output.
-///////////////////////////////////////////////////////////////////////////
-void initFile(int procIDX)
-{
-char filename[] = "x.out";
-filename[0] = procIDX + '0';
-if ((fw = fopen (filename, "w+")) == NULL)
-{
-perror ("fopen");
-exit (0);
-}
-}
-*/
 
 ///////////////////////////////////////////////////////////////////////////
 //process regular message.
@@ -411,16 +244,7 @@ void process_message(char* msg)
 			SP_leave ( Mbox, join_grp);
 			break;
 		case REQ_SEND:
-			mid++;
-			/*if (head_user == NULL)
-			  {
-			  head_user = malloc(sizeof(user_list));
-			  strncpy(head_user->user_name, msg+sizeof(int), LEN_USER);
-			  head_user->head_email = NULL;
-			  head_user->tail_email = NULL;
-			  head_user->next_user = NULL;
-			  }*/
-			add_message(mid, server_id, msg+sizeof(int));
+			add_message(server_id, msg+sizeof(int));
 			print_msgs();
 			//printf("this is the subject %s.\n", head_user->head_email->subject);
 			break;
@@ -428,8 +252,16 @@ void process_message(char* msg)
 		case REQ_HEAD:
 			send_header(Mbox, msg+sizeof(int));
 			break;
+		case REQ_DEL:
+			//implement del message.
+			del_message(msg+sizeof(int));
+			send_header(Mbox, msg+(sizeof(int)*3));
+			break;
+		case REQ_MSG:
+			req_message(Mbox, msg+sizeof(int));
+			break;
 		default:
-			printf("\nUnknown command received.\n");
+			printf("\nUnknown command received45. type- %d\n", msg_type);
 			break;
 	}
 }

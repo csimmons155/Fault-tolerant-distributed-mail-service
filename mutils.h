@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <netinet/in.h>
@@ -38,7 +39,13 @@
 #define SEND_HEAD	5
 #define SEND_NOHD	11
 #define SEND_MSG	6
+#define SEND_NOMSG	12
 #define SEND_MEM	1
+
+//header type defs, to client
+#define UPD_READ	20
+#define UPD_DEL		21
+#define UPD_MSG		22
 
 //message field lengths
 #define LEN_USER	10
@@ -46,7 +53,10 @@
 #define LEN_MSG		1000
 #define LEN_TOT		1104
 #define MAX_MSG		1400
+
+/////////////////////////////
 #define SUB_PER		13
+#define MAX_DIS		10
 //server group names, defined to prevent FFing.
 #define BS1			"BS1"
 #define BS2			"BS2"
@@ -86,6 +96,7 @@ char msg[LEN_MSG];
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct head_list {
 char from_name[LEN_USER];
+int read;
 int rec_svr;
 int msg_id;
 char subject[LEN_SUB];
@@ -103,10 +114,13 @@ struct email_list *tail_email;
 } user_list;
 
 //Define functions to work with structs.
-void add_message(int msg_id, int rec_svr, char* buffer);
-void del_message(int msg_id, int rec_svr, char* user_name);
+void add_message(int rec_svr, char* buffer);
+void del_message(char* msg);
 void print_msgs();
 void send_header(mailbox Mbox, char* buffer);
+void req_message(mailbox Mbox, char* buffer);
+void set_proc(int proc_id);
+void read_file();
 
 ////////////////////////////////////////////////////////////////////////////////
 //

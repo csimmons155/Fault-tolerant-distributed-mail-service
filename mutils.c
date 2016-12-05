@@ -12,11 +12,21 @@
 #include "mutils.h"
 
 user_list* head_user = NULL;
+static 	FILE 	*fw;
+int svr_id;
+int				mid = 0;
+
 //void get_user_box(user_list* user , char* to_user, user_list* head);
 static  void	Bye(mailbox Mbox);
+void delete_user(char* user_name);
+void print_msgs();
+void u_read_w(char* msg);
+void u_del_w(char* msg);
+void u_email_w(int svr, int id, char* msg);
+void update_message(char* buffer);
 
 ////////////////////////////////////////////////////////////////
-//Print all messages
+//Print everyone's messages.
 ///////////////////////////////////////////////////////////////
 void print_msgs()
 {
@@ -28,18 +38,28 @@ void print_msgs()
 		temp_email = temp->head_email;
 		while(temp_email != NULL)
 		{
-			printf("subject is %s.\n", temp_email->subject);
+			printf("subject is %s\t%d\t%d.\n", temp_email->subject, temp_email->rec_svr, temp_email->msg_id);
 			temp_email = temp_email->next_email;
 		}
 		temp = temp->next_user;
 	}
 }
+
+/////////////////////////////////////////////////////////////////////////
+//set the svr_id, for use in writing and reading from file.
+/////////////////////////////////////////////////////////////////////////
+void set_proc(int proc_id)
+{
+	svr_id= proc_id;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //add received message to the mailbox.
 ///////////////////////////////////////////////////////////////////////////////
-void add_message(int msg_id, int rec_svr, char* buffer)
+void add_message(int rec_svr, char* buffer)
 {
 	int total_length = 0;
+	mid++;
 	email_list* email = malloc(sizeof(email_list));
 	//get all of the required strings.
 	strncpy(email->to_name, buffer+total_length, LEN_USER);
@@ -49,10 +69,13 @@ void add_message(int msg_id, int rec_svr, char* buffer)
 	strncpy(email->subject, buffer+total_length, LEN_SUB);
 	total_length += LEN_SUB;
 	strncpy(email->msg, buffer+total_length, LEN_MSG);
+	email->next_email = NULL;
 	email->read = 0;
 	email->rec_svr = rec_svr;
-	email->msg_id = msg_id;
-
+	email->msg_id = mid;
+	//////write update to file//////////////////////////////////
+	u_email_w(rec_svr, mid, buffer);
+	//////////////////////////////////////////////////////////////////////
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
@@ -106,11 +129,11 @@ void send_header(mailbox Mbox, char* buffer)
 	total_length += LEN_USER;
 	strncpy(group_name, buffer+total_length, MAX_GROUP_NAME);
 	printf("sending %s's list to %s group.\n", username, group_name);
+	print_msgs();
 
 	user_list* temp = head_user;
 	while(temp != NULL)
 	{
-		printf("comparing %s and %s, size is %d vs %d.\n", temp->user_name, username, strlen(temp->user_name), strlen(username));
 		if (!strncmp(temp->user_name, username, LEN_USER))
 		{
 			break;
@@ -149,12 +172,17 @@ void send_header(mailbox Mbox, char* buffer)
 			tot_msg = tot_sub/SUB_PER + 1;
 		}
 		msg_type = SEND_HEAD;
-		memcpy(msg, &msg_type, sizeof(int));
+		memcpy(msg, &msg_type, sizeof(int));//add message type
+		memcpy(msg+sizeof(int), &tot_msg, sizeof(int));//add how many packs required.
+
 		e_list = temp->head_email;
 
 		for (int q = 0; q < tot_msg; q++)
 		{
-			total_length = sizeof(int);
+			total_length = sizeof(int) + sizeof(int);
+			memcpy(msg+total_length, &q, sizeof(int));//add which packet this is.
+			total_length+= sizeof(int);
+
 			if (tot_sub >= SUB_PER)
 			{
 				sub_for_pack = SUB_PER;
@@ -179,8 +207,12 @@ void send_header(mailbox Mbox, char* buffer)
 				strncpy(msg+total_length, e_list->from_name, LEN_USER);
 				total_length += LEN_USER;
 				strncpy(msg+total_length, e_list->subject, LEN_SUB);
+				printf("\nsub sending- %s.", e_list->subject);
 				total_length += LEN_SUB;
+
+				e_list = e_list->next_email;
 			}
+			printf("sending %d, %d, %d, %d, %d, %d, %d\n", ((int*)msg)[0], ((int*)msg)[1],((int*)msg)[2],((int*)msg)[3],((int*)msg)[4],((int*)msg)[5],((int*)msg)[6]);
 			ret= SP_multicast( Mbox, SAFE_MESS, group_name, 1, total_length, msg );
 			if( ret < 0 )
 			{
@@ -191,6 +223,9 @@ void send_header(mailbox Mbox, char* buffer)
 	}
 }
 
+//////////////////////////////////////////////////////////////
+//an error happened that the process won't recover from.
+////////////////////////////////////////////////////////////////
 static  void	Bye(mailbox Mbox)
 {
 
@@ -201,60 +236,44 @@ static  void	Bye(mailbox Mbox)
 	exit( 0 );
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//search for to_user's mailbox.  if doesn't exist make it.  mailbox
-//address.
-/////////////////////////////////////////////////////////////////////////////
-/*void get_user_box(user_list* user , char* to_user, user_list* head)
-  {
-  user_list* temp = head;
-  while (temp != NULL)
-  {
-  if (!strcmp(temp->user_name, to_user))
-  {
-  user = temp;
-  return;
-  }else
-  {
-  temp = temp->next_user;
-  }
-  }
-  temp = malloc(sizeof(user_list));
-  strncpy(temp->user_name,to_user, LEN_USER);
-  temp->head_email = NULL;
-  temp->tail_email = NULL;
-  temp->next_user = head;
-  head = temp;
-  user = temp;
-  printf("the user name is %s.\n", temp->user_name);
-  printf("the user name is %s.\n", head->user_name);
-  printf("the user name is %s.\n",user->user_name);
-
-  }
-  */
 //////////////////////////////////////////////////////////////////////////////
 //Search for message in user's box.  If it exists remove it.
 //If it doesn't exist then continue.
 /////////////////////////////////////////////////////////////////////////////
-void del_message(int msg_id, int rec_svr, char* user_name)
+void del_message(char* msg)
 {
+	int msg_id;
+	int rec_svr;
+
+	char user_name[LEN_USER];
+	//write to disk/////////////////////////////
+	u_del_w(msg);
+	///////////////////////////////
+
+	rec_svr = ((int*)msg)[0];
+	msg_id = ((int*)msg)[1];
+	strncpy(user_name, msg+sizeof(int)*2, LEN_USER);
+
+	//	printf("looking for %s.\n", user_name);
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
+		printf("comparing '%s' and '%s'\n", user_name, temp->user_name);
 		if (!strcmp(temp->user_name, user_name))
 		{
+			printf("found box for %s\n", user_name);
 			break;
 		}else
 		{
 			temp = temp->next_user;
 		}
 	}
-	if (temp != NULL)
+	if (temp == NULL)
 	{
 		printf("user's box was not found\n");
 		return;
 	}
-
+	printf("searching for message ID %d from server %d\n",msg_id, rec_svr);
 	email_list* temp_email = temp->head_email;
 	email_list* prev_email = NULL;
 	while(temp_email != NULL)
@@ -267,619 +286,410 @@ void del_message(int msg_id, int rec_svr, char* user_name)
 				{
 					temp->head_email = temp_email->next_email;
 					free(temp_email);
+					if (temp->head_email == NULL)
+					{
+						delete_user(temp->user_name);
+					}
 				}else
 				{
-
+					prev_email->next_email = temp_email->next_email;
+					if(temp_email->next_email == NULL)
+					{
+						temp->tail_email = prev_email;
+					}
+					free(temp_email);
 				}
+				printf("message deleted\n");
+				//***********************check if user has emails.  If not, delete him.
+
+				return;
 			}
 		}
+		prev_email = temp_email;
+		temp_email = temp_email->next_email;
 	}
 }
-/*
-///////////////////////////////////////////////////////////////////////
-//receive start message.  No timeout, reliable receive, print wait status.
-//When start message received, end function
-void rx_start(int sr)
-{
-fd_set             mask;
-fd_set             dummy_mask;
-int                bytes;
-int                num;
-char               mess_buf[MAX_PACKET_LEN];
-char			   targetStr[6] = "start";
-targetStr[5] =0;
-struct timeval timeout;
 
-FD_ZERO( &mask );
-FD_ZERO( &dummy_mask );
-FD_SET( sr, &mask );
-for(;;)
+//////////////////////////////////////////////////////////////////////////////
+//delete a user if they don't have any emails.
+////////////////////////////////////////////////////////////////////////////
+void delete_user(char* user_name)
 {
-fd_set temp_mask = mask;
-timeout.tv_sec = 10;
-timeout.tv_usec = 0;
-
-num = select( FD_SETSIZE, &temp_mask, &dummy_mask, &dummy_mask, &timeout);
-if (num > 0)
-{
-if ( FD_ISSET( sr, &temp_mask) )
-{
-bytes = recv( sr, mess_buf, sizeof(mess_buf), 0 );
-mess_buf[bytes] = 0;
-if (!strncmp(targetStr, mess_buf, bytes))
-{
-printf("\nstarting process\n");
-return;
-}
-}
-} else
-{
-printf(".");
-fflush(stdout);
-}
-}
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// receive and process packets until token is received.
-// /////////////////////////////////////////////////////////////////////////////////////
-void rx_probe(int sr, int ss, int addr, ran_block *start, int num_blocks_used, int *token, int *token_old, int loss_rate)
-{
-int num_to_jump = 0;
-int buff[BUFF_SIZE];
-int stoptimer = 0;
-while (1)
-{
-int bytes = rx(buff, sr, loss_rate);
-if (bytes>0)
-{
-if (buff[PACKET_TYPE] == TYPE_TOKEN)
-{
-if (buff[TOKEN_ID] > token_old[TOKEN_ID])
-{
-memcpy(token, buff, bytes);
-break;
-}
-}
-else if(buff[PACKET_TYPE] == TYPE_DATA)
-{
-int temp = (num_blocks_used+1) * BLOCK_SIZE;
-ran_block *temp_block= start;
-while (temp <= buff[PACK_ID])
-{
-	if (temp_block->next == NULL)
+	user_list* temp = head_user;
+	user_list* prev = NULL;
+	while (temp != NULL)
 	{
-		temp_block->next = malloc (sizeof(ran_block));
-		temp_block->next->num_used = 0;
-		temp_block->next->next = NULL;
-		memset(temp_block->next->block, 0 , BLOCK_SIZE*sizeof(wd));
+		if (!strcmp(temp->user_name, user_name))
+		{
+			break;
+		}else
+		{
+			prev = temp;
+			temp = temp->next_user;
+		}
 	}
-	temp_block = temp_block->next;
-	temp += BLOCK_SIZE;
-}
-temp_block->block[buff[PACK_ID]%BLOCK_SIZE].random_data= buff[RAN_NUM];
-temp_block->block[buff[PACK_ID]%BLOCK_SIZE].machine_index= buff[M_INDEX];
-temp_block->block[buff[PACK_ID]%BLOCK_SIZE].packet_index= buff[PACK_ID];
-}
-}else if (bytes < 0)
-{
-	stoptimer++;
-	if (stoptimer > TOKEN_RESEND_COUNT)
+	if(temp==NULL)
 	{
+		printf("error- user was not found so cannot be deleted.");
 		return;
 	}
-	tx(token, ((H_SIZE+token[CONT])*sizeof(int)), addr, ss);
-}
-}
-}
-
-//////////////////////////////////////////////////////////////////////////////////////
-// send a buffer of info to specified address.
-// ///////////////////////////////////////////////////////////////////////////////////
-void tx(int *buff,int buff_len, int addr, int ss)
-{
-	struct sockaddr_in send_addr;
-	send_addr.sin_family = AF_INET;
-	send_addr.sin_addr.s_addr = addr; // this is problematic because of the htonsl
-	send_addr.sin_port = htons (PORT);
-	sendto(ss, buff, buff_len, 0, (struct sockaddr *)&send_addr, sizeof(send_addr));
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-// receive a packet of info and pass to caller.
-// ///////////////////////////////////////////////////////////////////////////////
-int rx(int *buff, int sr, int loss_rate)
-{
-	fd_set mask, temp_mask, dummy_mask;
-	FD_ZERO (&mask);
-	FD_ZERO (&dummy_mask);
-	FD_SET (sr, &mask);
-	struct timeval timeout;
-	struct sockaddr_in from_addr;
-	timeout.tv_sec = TIMEOUT_SEC;
-	timeout.tv_usec = TIMEOUT_USEC;
-	temp_mask = mask;
-	int num = select (FD_SETSIZE, &temp_mask, &dummy_mask, &dummy_mask, &timeout);
-	if (num > 0)
+	if(prev == NULL)
 	{
-		if (FD_ISSET (sr, &temp_mask))
+		head_user =head_user->next_user;
+	}else
+	{
+		prev->next_user = temp->next_user;
+	}
+	printf("user was deleted\n");
+	free(temp);
+	print_msgs();
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//Find the message and send it to the user.
+//If it doesn't exist then inform the user.
+/////////////////////////////////////////////////////////////////////////////
+void req_message(mailbox Mbox, char* msg)
+{
+	int msg_id;
+	int rec_svr;
+	int msg_type;
+	char user_name[LEN_USER];
+	char group[MAX_GROUP_NAME];
+	//	char msg[MAX_MSG];
+	int runner = 0;
+	char msgS[MAX_MSG];
+	rec_svr = ((int*)msg)[0];
+	msg_id = ((int*)msg)[1];
+	runner = sizeof(int)*2;
+	strncpy(user_name, msg+runner, LEN_USER);
+	runner+= LEN_USER;
+	strncpy(group, msg+runner, MAX_GROUP_NAME);
+
+	user_list* temp = head_user;
+	while (temp != NULL)
+	{
+		printf("comparing '%s' and '%s'\n", user_name, temp->user_name);
+		if (!strcmp(temp->user_name, user_name))
 		{
-			socklen_t from_len = sizeof (from_addr);
-			int bytes = recv_dbg (sr, (char *)buff, BUFF_SIZE*sizeof(int), 0);
-			return bytes;
+			printf("found box for %s\n", user_name);
+			break;
+		}else
+		{
+			temp = temp->next_user;
 		}
 	}
-	else
+	if (temp == NULL)
 	{
-		return -1;
+		msg_type = SEND_NOMSG;
+		memcpy(msgS, &msg_type, sizeof(int));
+
+		SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
+
+		printf("user's box was not found\n");
+		return;
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-// Configure a socket to send MC traffic.
-//
-int initSM()
-{
-	int ss;
-	int ttl_val;
-
-	ss = socket(AF_INET, SOCK_DGRAM, 0);
-	if (ss<0) {
-		perror("Mcast: socket");
-		exit(1);
-	}
-
-	ttl_val = 1;
-	if (setsockopt(ss, IPPROTO_IP, IP_MULTICAST_TTL, (void *)&ttl_val,
-				sizeof(ttl_val)) < 0)
+	printf("searching for message ID %d from server %d\n",msg_id, rec_svr);
+	email_list* temp_email = temp->head_email;
+	while(temp_email != NULL)
 	{
-		printf("Mcast: problem in setsockopt of multicast ttl %d - ignore in WinNT or Win95\n", ttl_val );
-	}
-
-	return ss;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-//configure a socket to receive multicast traffic.
-int initRM(int mcast_addr)
-{
-	int sr;
-	struct ip_mreq mreq;
-	struct sockaddr_in mrecv_addr;
-
-	sr = socket(AF_INET, SOCK_DGRAM, 0); // socket for receiving
-	if (sr<0) {
-		perror("Mcast: socket");
-		exit(1);
-	}
-
-	mrecv_addr.sin_family = AF_INET;
-	mrecv_addr.sin_addr.s_addr = INADDR_ANY;
-	mrecv_addr.sin_port = htons(PORT);
-
-	if ( bind( sr, (struct sockaddr *)&mrecv_addr, sizeof(mrecv_addr) ) < 0 ) {
-		perror("Mcast: bind");
-		exit(1);
-	}
-
-	mreq.imr_multiaddr.s_addr = mcast_addr;
-
-	// the interface could be changed to a specific interface if needed
-	mreq.imr_interface.s_addr = htonl( INADDR_ANY );
-
-	if (setsockopt(sr, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&mreq,
-				sizeof(mreq)) < 0)
-	{
-		perror("Mcast: problem in setsockopt to join multicast address" );
-	}
-	return sr;
-}
-
-////////////////////////////////////////////////////////////////////////////
-//configure a socket to use unicast traffic.
-int initSU()
-{
-	int su = socket (AF_INET, SOCK_DGRAM, 0);
-	if (su < 0)
-	{
-		perror ("Ucast: socket");
-		exit(1);
-	}
-	return su;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////
-//send window of random numbers.
-//////////////////////////////////////////////////////////////////////////////////////
-void send_window(int window_size, int *token, ran_block *start_ptr, int blocks_used, int midx, int addr, int sms)
-{
-	int ran_num;
-	int block_start = blocks_used * BLOCK_SIZE;
-	int block_stop = block_start + BLOCK_SIZE;
-	ran_block *temp_block_ptr = start_ptr;
-	int buff[PACK_SIZE];
-
-	for (int i = 0; i < window_size; i++)
-	{
-		token[SEQ]++;//this is the packet id we are going to send.
-		do
+		if (temp_email->msg_id == msg_id)
 		{
-			ran_num = rand();
-		}while(!ran_num);// make sure ran_num != 0
-
-		//save the ran num in our ran_block.
-		if (token[SEQ] < block_start)
-		{
-			printf("trying to write ran number below threshold.\n");
-		}
-		while (token[SEQ] >= block_stop)
-		{
-			if (temp_block_ptr->next == NULL)
+			if (temp_email->rec_svr == rec_svr)
 			{
+				printf("message found\n");
 
-				//malloc another block.
-				temp_block_ptr->next = malloc (sizeof(ran_block));
-				temp_block_ptr->next->num_used = 0;
-				temp_block_ptr->next->next = NULL;
-				memset(temp_block_ptr->next->block, 0 , BLOCK_SIZE*sizeof(wd));
+				msg_type = SEND_MSG;
+				runner = 0;
+				memcpy(msgS, &msg_type, sizeof(int));//add message type
+				runner+=sizeof(int);
+				memcpy(msgS+runner, temp_email->from_name, LEN_USER);
+				runner+=LEN_USER;
+				memcpy(msgS+runner, temp_email->subject, LEN_SUB);
+				runner+=LEN_SUB;
+				memcpy(msgS+runner, temp_email->msg, LEN_MSG);
+				runner+=LEN_MSG;
+
+				SP_multicast( Mbox, SAFE_MESS, group, 1, runner, msgS );
+				if (!temp_email->read)
+				{
+					//write update to disk
+					u_read_w(msg);
+					temp_email->read = 1;
+					/////////////////////
+				}
+
+				return;
 			}
-			temp_block_ptr = temp_block_ptr->next;
-			block_stop+=BLOCK_SIZE;
 		}
-		temp_block_ptr->block[token[SEQ]%BLOCK_SIZE].random_data= ran_num;
-		temp_block_ptr->block[token[SEQ]%BLOCK_SIZE].machine_index= midx;
-		temp_block_ptr->block[token[SEQ]%BLOCK_SIZE].packet_index= token[SEQ];
-
-		//send packet.
-		buff[PACKET_TYPE] = TYPE_DATA;
-		buff[PACK_ID] = token[SEQ];
-		buff[RAN_NUM] = ran_num;
-		buff[M_INDEX] = midx;
-		tx(buff, PACK_SIZE*sizeof(int), addr , sms);
-		fflush(stdout);
+		temp_email = temp_email->next_email;
 	}
+
+	msg_type = SEND_NOMSG;
+	memcpy(msgS, &msg_type, sizeof(int));
+
+	SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
+
+	printf("email was not found.\n");
+
 }
 
-////////////////////////////////////////////////////////////////////////////
-//This is used to process the CLI.
-//its not very robust, will break if wrong input allowed.
-////////////////////////////////////////////////////////////////////////////
-int get_cli(long *num_packets, int *machine_index, int *num_machines, int *loss_rate, char *argv[], int argc)
+////////////////////////////////////////////////////////////////
+//write the read update to file.
+////////////////////////////////////////////////////////////////
+void u_read_w(char* msg)
 {
-	int success = 0;
-	if (argc < 5)
-	{
-		perror
-			("mcast <num of packets> <machine index> <number of machines> <loss rate>\n\
-			 where:\n\
-			 <num of packets> is the number of packets to send\n\
-			 <machine index> is (0-9)\n\
-			 <number of machines> is (1-10)\n\
-			 <loss rate> is the percent, 0-20, of recieve loss");
-		exit (1);
-	}
+	int msg_id;
+	int rec_svr;
+	int msg_type;
+	int runner = 0;
 
-	TRY
-	{
-		//convert input to values.
-		*num_packets = strtol(argv[1], NULL, 0);
-		*machine_index = (int) strtol (argv[2], NULL, 0);
-		*num_machines = (int) strtol (argv[3], NULL, 0);
-		*loss_rate = (int) strtol (argv[4], NULL, 0);
-		success = 1;
-	}
-	CATCH
-	{
-		success = 0;
-	}
-	ETRY;
-
-	return success;
-}
-
-///////////////////////////////////////////////////////////////////////////
-//open a file, fw, for writing.  name the file id#.out
-/////////////////////////////////////////////////////////////////////////
-FILE* initFile(int procIDX)
-{
-	char filename[6];
-	static FILE *fw;
-	snprintf(filename, 6, "%d", procIDX);
-	filename[1] = '.';
-	filename[2] = 'o';
-	filename[3] = 'u';
-	filename[4] = 't';
-	filename[5] = 0;
-	if ((fw = fopen (filename, "w+")) == NULL)
+	char filename[] = "x.db";
+	filename[0] = svr_id + '0';
+	if ((fw = fopen (filename, "a+")) == NULL)
 	{
 		perror ("fopen");
 		exit (0);
 	}
-	return fw;
+
+	msg_type = UPD_READ;
+	rec_svr = ((int*)msg)[0];
+	msg_id = ((int*)msg)[1];
+	runner = sizeof(int)*2;
+	fwrite((void *)(&msg_type), sizeof(int), 1, fw);
+	fwrite((void *)(&rec_svr), sizeof(int), 1, fw);
+	fwrite((void *)(&msg_id), sizeof(int), 1, fw);
+	fwrite((void *)(msg+runner), LEN_USER, 1, fw);
+	fclose(fw);
+	printf("\nupdate written to disk of type %d\n", msg_type);
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-// send retrans based on list provided.
-// ///////////////////////////////////////////////////////////////////////////
-void sendRetrans(int *buff, ran_block *start_ptr, int num_blocks, int machine_index, int sms)
+/////////////////////////////////////////////////////////////////
+//write the del update to file.
+////////////////////////////////////////////////////////////////
+void u_del_w(char* msg)
 {
-	int block_start = num_blocks * BLOCK_SIZE;
-	int block_stop = block_start + BLOCK_SIZE;
-	ran_block *temp_block_ptr = start_ptr;
-	int retrans_buff[PACK_SIZE];
+	int msg_type;
+	int msg_id;
+	int rec_svr;
 
-	for (int m = 0; m < buff[CONT]; m++)
+	char user_name[LEN_USER];
+
+	msg_type = UPD_DEL;
+	rec_svr = ((int*)msg)[0];
+	msg_id = ((int*)msg)[1];
+	strncpy(user_name, msg+sizeof(int)*2, LEN_USER);
+
+	char filename[] = "x.db";
+	filename[0] = svr_id + '0';
+	if ((fw = fopen (filename, "a+")) == NULL)
 	{
-		if (buff[m+H_SIZE] < block_start)
-		{
-			printf("received retrans request for discarded ran_num\n");
-		}
-		while (buff[m+H_SIZE] >= block_stop)
-		{
-			if (temp_block_ptr->next == NULL)
-			{
-				return;
-			} else
-			{
-				temp_block_ptr = temp_block_ptr->next;
-				block_stop+=BLOCK_SIZE;
-			}
-		}
-		if (temp_block_ptr->block[buff[m+H_SIZE]%BLOCK_SIZE].random_data)
-		{
-			retrans_buff[PACKET_TYPE] = TYPE_DATA;
-			retrans_buff[PACK_ID] = buff[m+H_SIZE];
-			retrans_buff[RAN_NUM] = temp_block_ptr->block[buff[m+H_SIZE]%BLOCK_SIZE].random_data;
-			retrans_buff[M_INDEX] = temp_block_ptr->block[buff[m+H_SIZE]%BLOCK_SIZE].machine_index;
-			tx(retrans_buff, PACK_SIZE*sizeof(int), htonl(MCAST_ADDR), sms);
-		}
+		perror ("fopen");
+		exit (0);
 	}
+
+	fwrite((void *)(&msg_type), sizeof(int), 1, fw);
+	fwrite((void *)(&rec_svr), sizeof(int), 1, fw);
+	fwrite((void *)(&msg_id), sizeof(int), 1, fw);
+	fwrite((void *)user_name, LEN_USER, 1, fw);
+	fclose(fw);
+	printf("\nupdate written to disk of type %d\n", msg_type);
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-//This will get all the IPs and store them in the IP_list.  This function
-//assumes we can use lossless receive for initialization.
-void getIPs(int *IP_list, int sr, int ss, int mcast_addr, int num_machines, int machine_index)
+/////////////////////////////////////////////////////////////////
+//write the add update to file.
+////////////////////////////////////////////////////////////////
+void u_email_w(int svr, int id, char* msg)
 {
-	struct sockaddr_in from_addr;
-	struct sockaddr_in send_addr;
-	send_addr.sin_family = AF_INET;
-	send_addr.sin_addr.s_addr = mcast_addr;
-	send_addr.sin_port = htons (PORT);
+	int msg_type;
+	int msg_id;
+	int rec_svr;
+	int runner;
 
-	fd_set             mask;
-	fd_set             dummy_mask;
-	int                bytes;
-	int                num;
-	int               mess_buf[5];
+	msg_type = UPD_MSG;
+	rec_svr = svr;
+	msg_id = id;
+	//	strncpy(user_name, msg+sizeof(int)*2, LEN_USER);
 
-	int recd = 0; // how many IPs do I already have.
-
-	FD_ZERO( &mask );
-	FD_ZERO( &dummy_mask );
-	FD_SET( sr, &mask );
-
-	for (int i = 0; i < num_machines; i++)//zero the IP list.
+	char filename[] = "x.db";
+	filename[0] = svr_id + '0';
+	if ((fw = fopen (filename, "a+")) == NULL)
 	{
-		IP_list[i]=0;
+		perror ("fopen");
+		exit (0);
 	}
-	//send a message with 4 zeros followed by your process ID.
-	mess_buf[0]=0;
-	mess_buf[1]=0;
-	mess_buf[2]=0;
-	mess_buf[3]=0;
-	mess_buf[4]=machine_index;
+	runner = 0;
+	fwrite((void *)(&msg_type), sizeof(int), 1, fw);
+	fwrite((void *)(&rec_svr), sizeof(int), 1, fw);
+	fwrite((void *)(&msg_id), sizeof(int), 1, fw);
+	fwrite((void *)(msg+runner), LEN_USER, 1, fw);
+	runner+=LEN_USER;
+	fwrite((void *)(msg+runner), LEN_USER, 1, fw);
+	runner+=LEN_USER;
+	fwrite((void *)(msg+runner), LEN_SUB, 1, fw);
+	runner+=LEN_SUB;
+	fwrite((void *)(msg+runner), LEN_MSG, 1, fw);
 
-	sendto(ss, mess_buf, 5*sizeof(int), 0, (struct sockaddr *)&send_addr, sizeof(send_addr));
-	printf("starting to collect IPs\n");
-	for(;;)
+	fclose(fw);
+	printf("\nupdate written to disk of type %d\n", msg_type);
+}
+
+///////////////////////////////////////////////////////////////////////
+//Process file of updates.
+/////////////////////////////////////////////////////////////////////
+void read_file()
+{
+	int upd_type;
+	int size_msg = sizeof(int)*2+LEN_USER*2+LEN_SUB+LEN_MSG;
+	int size_del = sizeof(int)*2+LEN_USER;
+	int size_red = sizeof(int)*2+LEN_USER;
+	char update[MAX_MSG];
+	char filename[] = "x.db";
+	filename[0] = svr_id + '0';
+
+	struct stat buffer;
+	if(!stat(filename, &buffer))
 	{
-		fd_set temp_mask = mask;
-
-		num = select( FD_SETSIZE, &temp_mask, &dummy_mask, &dummy_mask, 0);
-		if (num > 0)
+		if ((fw = fopen (filename, "r")) == NULL)
 		{
-			if ( FD_ISSET( sr, &temp_mask) )
+			perror ("fopen");
+			exit (0);
+		}
+		while(fread((void *)&upd_type, sizeof(int), 1, fw)!= 0)
+		{
+			if (upd_type == UPD_READ)
 			{
-				socklen_t from_len = sizeof (from_addr);
-				bytes = recvfrom( sr, mess_buf, sizeof(mess_buf), 0,
-						(struct sockaddr *) &from_addr, &from_len);
-				if(bytes == 5 * sizeof(int))
+				printf("update received: %d\n", upd_type);
+				fread((void *)update, size_red, 1, fw);
+			}else if (upd_type == UPD_DEL)
+			{
+				printf("update received: %d\n", upd_type);
+				fread((void *)update, size_del, 1, fw);
+			}else if(upd_type == UPD_MSG)
+			{
+				printf("update received: %d\n", upd_type);
+				if (!fread((void *)update, size_msg, 1, fw))
 				{
-					int fromIDX = mess_buf[4];
-					if (!IP_list[fromIDX])
-					{
-						IP_list[fromIDX]= from_addr.sin_addr.s_addr;
-						recd++;
-						if (recd == num_machines){
-							return;
-						}
-					}
+				printf("no data was read\n");
 				}
+				printf("here is the string %s and thats\n", update);
+update_message(update);
+			}else
+			{
+				printf("unrecognized update received: %d\n", upd_type);
 			}
 		}
-	}
-	printf("done collecting IPs\n");
-}
+		fclose(fw);
+		printf("\nthe file was processed.\n");
+print_msgs();
 
-////////////////////////////////////////////////////////////////////////////////
-//Set initial values for current and old token.
-///////////////////////////////////////////////////////////////////////////////
-void init_tokens(int *token, int *token_old)
-{
-	token[PACKET_TYPE] = TYPE_TOKEN;
-	token[TOKEN_ID] = -1;
-	token[SEQ] = -1;
-	token[ARU] = -1;
-	token[ARU_ID] = 11;
-	token[CONT] = 0;
-
-	token_old[PACKET_TYPE] = TYPE_TOKEN;
-	token_old[TOKEN_ID] = -1;
-	token_old[SEQ] = -1;
-	token_old[ARU] = -2;
-	token_old[ARU_ID] = 11;
-	token_old[CONT] = 0;
-
-	//memcpy(token_old, token, H_SIZE * sizeof(int));
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//send token calculates aru, adds required nacks, then sends token unicast to
-//next id. aru = last successfully received in order packet.
-///////////////////////////////////////////////////////////////////////////////
-void send_token(int *token, ran_block *start, int num_blocks_used, int midx, int num_macs, int *ips, int ss, int *my_aru)
-{
-	int start_block = num_blocks_used * BLOCK_SIZE;
-	int stop_block = start_block + BLOCK_SIZE;
-	int index = *my_aru+1;
-	int last_look = BLOCK_SIZE;
-	int my_aru_flag = 0;
-	int addr;
-	ran_block *temp = start;
-
-	token[CONT] = 0;
-
-	while (index >= stop_block)
+	}else
 	{
-		temp = temp->next;
-		if (temp == NULL)
-		{
-			break;
-		}
-		stop_block += BLOCK_SIZE;
-		start_block += BLOCK_SIZE;
+		printf("\nNo database was found\n");
 	}
+}
 
+////////////////////////////////////////////////////////////////////////////////
+//add update: message
+///////////////////////////////////////////////////////////////////////////////
+void update_message(char* buffer)
+{
+	int total_length = 0;
+	int rec_svr;
+	int msg_id;
+	rec_svr = ((int*)buffer)[0];
+	msg_id = ((int*)buffer)[1];
+	//make sure message ID is good.
+	if (msg_id > mid)
+	{
+mid = msg_id;
+	}
+	printf("rec_svr is %d, and msg_id is %d\n", rec_svr, msg_id);
+	total_length = sizeof(int)*2;
+	email_list* email = malloc(sizeof(email_list));
+	//get all of the required strings.
+	strncpy(email->to_name, buffer+total_length, LEN_USER);
+	total_length += LEN_USER;
+	strncpy(email->from_name, buffer+total_length, LEN_USER);
+	total_length += LEN_USER;
+	strncpy(email->subject, buffer+total_length, LEN_SUB);
+	total_length += LEN_SUB;
+	strncpy(email->msg, buffer+total_length, LEN_MSG);
+	email->next_email = NULL;
+	email->read = 0;
+	email->rec_svr = rec_svr;
+	email->msg_id = msg_id;
+printf("user is %s\n", email->to_name);
+	user_list* temp = head_user;
 	while (temp != NULL)
 	{
-		if (temp->next == NULL){
-			last_look = token[SEQ]%BLOCK_SIZE + 1;
-		}
-		for (int m = index%BLOCK_SIZE; m < last_look; m++)
+		if (!strcmp(temp->user_name, email->to_name))
 		{
-			if (!temp->block[m].random_data)
-			{
-				token[token[CONT] + H_SIZE] = m + start_block;
-				token[CONT]++;
-				if (!my_aru_flag)
+			break;
+		}else
+		{
+			temp = temp->next_user;
+		}
+	}
+
+	if(temp == NULL)
+	{
+		temp = malloc(sizeof(user_list));
+		strncpy(temp->user_name,email->to_name, LEN_USER);
+		temp->head_email = NULL;
+		temp->tail_email = NULL;
+		temp->next_user = head_user;
+		head_user = temp;
+	}
+
+	//find where to insert message.
+	if (temp->tail_email == NULL)
+	{
+		temp->tail_email = email;
+		temp->head_email = email;
+		return;
+	}
+
+	email_list *curr = temp->head_email;
+	email_list *prev = NULL;
+	while(curr != NULL)
+	{
+		if (curr->msg_id < email->msg_id)
+		{
+			prev = curr;
+			curr = curr->next_email;
+		}else if (curr->msg_id == email->msg_id)
+		{
+			do{
+				if (curr->rec_svr < email->rec_svr && curr->msg_id == email->msg_id)
 				{
-					my_aru_flag = 1;
-					*my_aru = m+start_block-1;
-				}
-				if (token[CONT] == (BUFF_SIZE - H_SIZE))
+					prev = curr;
+					curr = curr->next_email;
+				}else
 				{
 					break;
 				}
-			}
-		}
-		temp = temp->next;
-		index = 0;
-		stop_block += BLOCK_SIZE;
-		start_block += BLOCK_SIZE;
-
-		if (token[CONT] == (BUFF_SIZE - H_SIZE))
+			}while (curr != NULL);
+			break;
+		}else
 		{
 			break;
 		}
 	}
-
-	if (!my_aru_flag)
+	if (prev == NULL)
 	{
-		*my_aru = token[SEQ];
-	}
-
-	token[TOKEN_ID]++;
-
-	addr = ips[(midx+1)%num_macs];
-
-	if (token[ARU_ID] == 11)
+		email->next_email = temp->head_email;
+		temp->head_email = email;
+	}else
 	{
-		token[ARU] = *my_aru;
-		token[ARU_ID] = midx;
-	}
-
-	if (*my_aru < token[ARU])
-	{
-		token[ARU] = *my_aru;
-		token[ARU_ID] = midx;
-	}else if (token[ARU_ID] == midx)
-	{
-		token[ARU] = *my_aru;
-	}
-
-	if (token[SEQ] == token[ARU])
-	{
-		token[ARU_ID] = 11;
-	}
-	for (int n = 0 ; n < token[CONT]; n++){
-	}
-	tx(token, ((H_SIZE+token[CONT])*sizeof(int)), addr, ss);
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// if any blocks exist below global_aru then write them to disk and free block.
-// ///////////////////////////////////////////////////////////////////////////
-void clean_block(ran_block **start_ptr, int *num_blocks_used, int global_aru, FILE *fw)
-{
-	int stop_point = (*num_blocks_used+1) * BLOCK_SIZE;
-	ran_block *temp = *start_ptr;
-	while(global_aru >= stop_point)
-	{
-		for (int q = 0; q < BLOCK_SIZE; q++)
+		prev->next_email = email;
+		email->next_email = curr;
+		if (curr == NULL)
 		{
-			fprintf(fw, "%2d, %8d, %8d\n", (*start_ptr)->block[q].machine_index, (*start_ptr)->block[q].packet_index, (*start_ptr)->block[q].random_data);
+			temp->tail_email= email;
 		}
-		(*num_blocks_used)++;
-		if((*start_ptr)->next == NULL)
-		{
-			fflush(0);
-			(*start_ptr)->next = malloc(sizeof(ran_block));
-			(*start_ptr)->next->num_used = 0;
-			(*start_ptr)->next->next = NULL;
-			memset((*start_ptr)->next->block, 0 , BLOCK_SIZE*sizeof(wd));
-		}
-
-		*start_ptr = (*start_ptr)->next;
-
-		free(temp);
-		//just added this.  May not work.
-		temp = *start_ptr;
-		stop_point+=BLOCK_SIZE;
 	}
 }
-
-//////////////////////////////////////////////////////////////////////////////////
-// empty out the last block of random numbers prior to closing the file pointer.
-// ///////////////////////////////////////////////////////////////////////////////
-void clean_last_block(ran_block **start_ptr, FILE *fw)
-{
-	int last_used;
-	ran_block *temp = *start_ptr;
-	while(*start_ptr != NULL)
-	{
-		for (int m = 0; m < BLOCK_SIZE; m++)
-		{
-			if (!(*start_ptr)->block[m].random_data)
-			{
-				last_used = m;
-				break;
-			}
-			if (m == BLOCK_SIZE-1)
-			{
-				last_used = BLOCK_SIZE;
-			}
-		}
-		for (int q = 0; q < last_used; q++)
-		{
-			fprintf(fw, "%2d, %8d, %8d\n", (*start_ptr)->block[q].machine_index, (*start_ptr)->block[q].packet_index, (*start_ptr)->block[q].random_data);
-		}
-		*start_ptr = (*start_ptr)->next;
-
-		free(temp);
-		temp = *start_ptr;
-	}
-}*/
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History
