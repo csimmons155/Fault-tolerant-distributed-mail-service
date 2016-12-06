@@ -42,10 +42,11 @@
 #define SEND_NOMSG	12
 #define SEND_MEM	1
 
-//header type defs, to client
+//header type defs,to servers
 #define UPD_READ	20
 #define UPD_DEL		21
 #define UPD_MSG		22
+#define VIEW		23
 
 //message field lengths
 #define LEN_USER	10
@@ -81,13 +82,13 @@
 //Linked list to hold user's messages.
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct email_list {
-char to_name[LEN_USER];//not sure this is needed.
-char from_name[LEN_USER];
-int read; //read equals zero if message is unread.
-int rec_svr; //server that origionally received the message from a client.
-int msg_id; //msg id assigned to msg from rec_srv.
-char subject[LEN_SUB];
-char msg[LEN_MSG];
+	char to_name[LEN_USER];//not sure this is needed.
+	char from_name[LEN_USER];
+	int read; //read equals zero if message is unread.
+	int rec_svr; //server that origionally received the message from a client.
+	int msg_id; //msg id assigned to msg from rec_srv.
+	char subject[LEN_SUB];
+	char msg[LEN_MSG];
 	struct email_list *next_email;
 } email_list;
 
@@ -95,33 +96,54 @@ char msg[LEN_MSG];
 //Linked list to hold user's list of headers.
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct head_list {
-char from_name[LEN_USER];
-int read;
-int rec_svr;
-int msg_id;
-char subject[LEN_SUB];
-struct head_list *next_head;
+	char from_name[LEN_USER];
+	int read;
+	int rec_svr;
+	int msg_id;
+	char subject[LEN_SUB];
+	struct head_list *next_head;
 } head_list;
 
 ////////////////////////////////////////////////////////////////////////////////
 //Linked list to hold user's name and list of emails.
 ////////////////////////////////////////////////////////////////////////////////
 typedef struct user_list {
-char user_name[LEN_USER];
-struct email_list *head_email;
-struct email_list *tail_email;
+	char user_name[LEN_USER];
+	struct email_list *head_email;
+	struct email_list *tail_email;
 	struct user_list *next_user;
 } user_list;
 
+///////////////////////////////////////////////////////////////////////////////
+//Linked lists to hold updates.  Three types: msg, del, read.
+////////////////////////////////////////////////////////////////////////////////
+typedef struct update_list {
+	int update_type;
+	int rec_svr; //server that origionally received the message from a client.
+	int msg_id; //msg id assigned to msg from rec_srv.
+	char buffer[MAX_MSG];
+	struct update_list *next_update;
+} update_list;
+
 //Define functions to work with structs.
-void add_message(int rec_svr, char* buffer);
+void add_message(char* buffer);
 void del_message(char* msg);
 void print_msgs();
 void send_header(mailbox Mbox, char* buffer);
 void req_message(mailbox Mbox, char* buffer);
 void set_proc(int proc_id);
+void set_mbox(mailbox Mbox);
 void read_file();
-
+void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers);
+void send_view(mailbox Mbox);
+void u_email_w(char *msg);
+void u_del_w(char* msg);
+void u_read_w(char* msg);
+void add_update_list(int update_type, char *buffer);
+void update_message(char *buffer);
+void update_delete(char* msg);
+void update_read(char* msg);
+void write_update(char *buffer);
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History

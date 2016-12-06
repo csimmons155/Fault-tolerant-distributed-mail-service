@@ -173,9 +173,7 @@ static	void	User_command()
 				break;
 
 			default:
-
-				printf("\0333[2J");
-				printf("Unknown commnad8\n");
+				printf("Unknown command8\n");
 				Print_menu();
 				break;
 		}
@@ -263,7 +261,6 @@ static	void	User_command()
 				break;
 
 			default:
-				printf("\0333[2J");
 				printf("\n\n\n\n\n\n\n\nUnknown commnad\n");
 				show_header();
 				break;
@@ -399,6 +396,24 @@ static	void	Read_message()
 							printf("Unable to connect to server %d.\n", targ_svr + 1);
 						}
 					}
+				}else if (!strcmp(sender, "ALL_TEST"))//what servers are visible.
+				{
+					ret = 0;
+					printf("\n\n\n\n\n\n\n\nservers in group-\n");
+					for( i=0; i < num_groups; i++ )
+					{
+						if (!strncmp( &target_groups[i][1], "BS", 2))
+						{
+							ret = 1;
+							printf("%s\n", &target_groups[i][1]);
+						}
+					}
+					if (!ret)
+					{
+						printf("none\n");
+					}
+					printf("******************\n");
+					Print_menu();
 				}
 				////////////////////////////////////////////////////////////
 				printf("Due to the JOIN of %s\n", memb_info.changed_member );
@@ -410,7 +425,7 @@ static	void	Read_message()
 					{
 						curr_svr = -1;
 						if (targ_svr == -1){
-							printf("disconnected from server\n");
+							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
 							Print_menu();
 						}
 					}
@@ -425,7 +440,7 @@ static	void	Read_message()
 					{
 						curr_svr = -1;
 						if (targ_svr == -1){
-							printf("disconnected from server\n");
+							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
 							Print_menu();
 						}
 					}
@@ -441,7 +456,7 @@ static	void	Read_message()
 					{
 						curr_svr = -1;
 						if (targ_svr == -1){
-							printf("disconnected from server\n");
+							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
 							Print_menu();
 						}
 					}
@@ -552,6 +567,7 @@ void connect_svr()
 	int svr_num = targ_svr;
 
 	//join new server and unjoin previous server.
+	printf("trying to join server %d.\n", svr_num+1);
 	msg_type = REQ_JOIN;
 	strcpy(groups, server_list[svr_num] );
 	memcpy(mess, &msg_type, sizeof(int));
@@ -561,7 +577,7 @@ void connect_svr()
 
 	if (curr_svr != -1){
 		msg_type = REQ_LEV;
-		strcpy(groups, server_list[svr_num] );
+		strcpy(groups, server_list[curr_svr] );
 		memcpy(mess, &msg_type, sizeof(int));
 		strcpy(mess+sizeof(int), join_svr_grp);
 
@@ -577,7 +593,8 @@ void connect_svr()
 ///////////////////////////////////////////////////////////////////////////////
 void print_servers()
 {
-
+	SP_join ( Mbox, "ALL_TEST");
+	SP_leave ( Mbox, "ALL_TEST");
 }
 
 //////////////////////////////////////////////////////////////////////////////

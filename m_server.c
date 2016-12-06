@@ -25,6 +25,8 @@ static 	FILE 	*fw;
 //user_list*		head_user = NULL;
 int		server_id;
 char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
+int servers_present[5] = { 0 };
+int num_servers_present = 0;
 
 /*
 #define MAX_MESSLEN     102400
@@ -36,7 +38,7 @@ char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  
 #define M_IDX			1
 #define R_NUM			2
 */
-int start_proc();
+//int start_proc();
 void send_mess(int mess_ind, int proc_ind, int num_to_send);
 void rec_mess(int num_to_rec);
 void Print_help();
@@ -76,9 +78,9 @@ int main( int argc, char *argv[] )
 	{
 		Print_help();
 	}
-set_proc(server_id);
+	set_proc(server_id);
 	//before connecting to spread, read info from file to regain state.
-read_file();
+	read_file();
 
 	//connect to spread.
 	sp_time test_timeout;
@@ -91,7 +93,8 @@ read_file();
 		SP_error( ret );
 		Bye();
 	}
-	printf("connected to server.\n");
+	printf("connected to spread server.\n");
+	set_mbox(Mbox);
 
 	//Join required mailboxes.
 	SP_join ( Mbox, server_list[server_id]);
@@ -156,6 +159,47 @@ read_file();
 
 				if( Is_caused_join_mess( service_type ) )
 				{
+					if (!strcmp(sender, "ALL_SVR"))//what servers are visible.
+					{
+						num_servers_present = 0;
+						for (int m = 0; m < 5; m++)
+						{
+							servers_present[i] = 0;
+						}
+						for( i=0; i < num_groups; i++ )
+						{
+							if (!strncmp( &target_groups[i][1], BS1, 3))
+							{
+								printf("server 1 present");
+								servers_present[0] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS2, 3))
+							{
+								printf("server 2 present");
+								servers_present[1] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS3, 3))
+							{
+								printf("server 3 present");
+								servers_present[2] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS4, 3))
+							{
+								printf("server 4 present");
+								servers_present[3] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS5, 3))
+							{
+								printf("server 5 present");
+								servers_present[4] = 1;
+								num_servers_present++;
+							}
+						}
+						if (num_servers_present>1)
+						{
+							send_view(Mbox);
+						}
+					}
 					printf("Due to the JOIN of %s\n", memb_info.changed_member );
 				}else if( Is_caused_leave_mess( service_type ) ){
 					printf("Due to the LEAVE of %s\n", memb_info.changed_member );
@@ -242,13 +286,15 @@ void process_message(char* msg)
 		case REQ_LEV:
 			strcpy(join_grp , msg+sizeof(int));
 			SP_leave ( Mbox, join_grp);
+			printf("leaving group %s.\n", join_grp);
 			break;
-		case REQ_SEND:
-			add_message(server_id, msg+sizeof(int));
+		case REQ_SEND://received email from user.
+			add_message(msg+sizeof(int));
+			u_email_w(msg+sizeof(int));
+			add_update_list(UPD_MSG, msg+sizeof(int));
 			print_msgs();
 			//printf("this is the subject %s.\n", head_user->head_email->subject);
 			break;
-
 		case REQ_HEAD:
 			send_header(Mbox, msg+sizeof(int));
 			break;
@@ -256,9 +302,45 @@ void process_message(char* msg)
 			//implement del message.
 			del_message(msg+sizeof(int));
 			send_header(Mbox, msg+(sizeof(int)*3));
+			u_del_w(msg+sizeof(int));
+			add_update_list(UPD_DEL, msg+sizeof(int));
 			break;
 		case REQ_MSG:
 			req_message(Mbox, msg+sizeof(int));
+
+			u_read_w(msg+sizeof(int));
+			add_update_list(UPD_READ, msg+sizeof(int));
+			break;
+		case VIEW:
+			merge_view(Mbox, msg+sizeof(int), servers_present, num_servers_present);
+			break;
+		case UPD_MSG:
+			printf("received update of type message.");
+			if(((int *)msg)[1] == server_id)
+			{
+				break;
+			}
+			update_message(msg+sizeof(int));
+			write_update(msg);
+			break;
+		case UPD_DEL:
+			if(((int *)msg)[1] == server_id)
+			{
+				break;
+			}
+			printf("received update of type delete.");
+			update_delete(msg+sizeof(int));
+			write_update(msg);
+			//TODO save all updates to list.
+			break;
+		case UPD_READ:
+			if(((int *)msg)[1] == server_id)
+			{
+				break;
+			}
+			printf("received update of type read.");
+			update_read(msg+sizeof(int));
+			write_update(msg);
 			break;
 		default:
 			printf("\nUnknown command received45. type- %d\n", msg_type);
