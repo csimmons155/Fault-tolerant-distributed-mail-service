@@ -11,32 +11,48 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "mutils.h"
 
-user_list* head_user = NULL;
-update_list *head_update = NULL;
-update_list *tail_update = NULL;
+user_list 		*head_user = NULL;
+update_list 	*head_update = NULL;
+update_list 	*tail_update = NULL;
 static 	FILE 	*fw;
-int svr_id;
-mailbox m_box;
+int 			svr_id;
+mailbox 		m_box;
 int				mid = 0;
-int svr_know[5][5] = { 0 };
-//int num_svr_in_group = 0;//keep track of the servers in the group.
-int svr_upd_received = 0;//keep track of how many updates have been received from all servers in the group.
-//int svr_in_group[5] = {0};
-int min_updates[5] = { 0 };
-int max_updates[5] = {0};
-//void get_user_box(user_list* user , char* to_user, user_list* head);
+int 			svr_know[5][5] = { 0 };
+int 			svr_upd_received[5];//keep track of how many updates have been received from all servers in the group.
+int 			min_updates[5] = { 0 };
+int 			max_updates[5] = {0};
+
 static  void	Bye(mailbox Mbox);
 void delete_user(char* user_name);
 void print_msgs();
-//void u_read_w(char* msg);
-//void u_del_w(char* msg);
-//void u_email_w(int svr, int id, char* msg);
-//void update_message(char* buffer);
-//void update_delete(char* msg);
-//void update_read(char* msg);
-//void add_update_list(int update_type, int rec_svr, int msg_id, char *buffer);
 void send_updates(int upd_id, int svr_id);
 void send_update(int upd_id, int svr_id);
+void print_view();
+void print_list();
+
+void reset_svr_upd_received()
+{
+	for(int i = 0; i < 5; i++)
+	{
+	svr_upd_received[i] = 0;
+min_updates[i] = svr_know[svr_id][i];
+			max_updates[i] = svr_know[svr_id][i];
+	}
+}
+////////////////////////////////////////////////////////////////
+//print the contents of the update list.
+///////////////////////////////////////////////////////////////
+void print_list()
+{
+update_list *temp = head_update;
+printf("\n\n\nprinting list:\n");
+while (temp!= NULL)
+{
+printf("type %d, svr %d, id %d\n",temp->update_type, temp->rec_svr, temp->msg_id);
+temp = temp->next_update;
+}
+}
 ////////////////////////////////////////////////////////////////
 //Print everyone's messages.
 ///////////////////////////////////////////////////////////////
@@ -73,6 +89,21 @@ void set_mbox(mailbox Mbox)
 	m_box = Mbox;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+//Print the view to screen.
+///////////////////////////////////////////////////////////////////////////////
+void print_view()
+{
+	printf("\t   1   2   3   4   5");
+	for (int m = 0; m < 5; m++)
+	{
+		printf("\n\t%d  ", m+1);
+		for(int n = 0; n < 5; n++)
+		{
+			printf("%d   ", svr_know[m][n]);
+		}
+	}
+}
 ////////////////////////////////////////////////////////////////////////////////
 //add received message from user
 ///////////////////////////////////////////////////////////////////////////////
@@ -93,13 +124,6 @@ void add_message( char* buffer)
 	email->read = 0;
 	email->rec_svr = svr_id;
 	email->msg_id = mid;
-	//////write update to file//////////////////////////////////
-	//u_email_w(svr_id, mid, buffer);
-	//////////////////////////////////////////////////////////////////////
-	//add update to list and send to all.
-	//add_update_list(UPD_MSG, svr_id, mid, buffer);
-	//send_update(mid, rec_id);
-	//////////////////////////////////////////////////
 
 	user_list* temp = head_user;
 	while (temp != NULL)
@@ -199,7 +223,6 @@ void send_header(mailbox Mbox, char* buffer)
 		msg_type = SEND_HEAD;
 		memcpy(msg, &msg_type, sizeof(int));//add message type
 		memcpy(msg+sizeof(int), &tot_msg, sizeof(int));//add how many packs required.
-
 		e_list = temp->head_email;
 
 		for (int q = 0; q < tot_msg; q++)
@@ -207,7 +230,6 @@ void send_header(mailbox Mbox, char* buffer)
 			total_length = sizeof(int) + sizeof(int);
 			memcpy(msg+total_length, &q, sizeof(int));//add which packet this is.
 			total_length+= sizeof(int);
-
 			if (tot_sub >= SUB_PER)
 			{
 				sub_for_pack = SUB_PER;
@@ -232,12 +254,10 @@ void send_header(mailbox Mbox, char* buffer)
 				strncpy(msg+total_length, e_list->from_name, LEN_USER);
 				total_length += LEN_USER;
 				strncpy(msg+total_length, e_list->subject, LEN_SUB);
-				printf("\nsub sending- %s.", e_list->subject);
 				total_length += LEN_SUB;
 
 				e_list = e_list->next_email;
 			}
-			printf("sending %d, %d, %d, %d, %d, %d, %d\n", ((int*)msg)[0], ((int*)msg)[1],((int*)msg)[2],((int*)msg)[3],((int*)msg)[4],((int*)msg)[5],((int*)msg)[6]);
 			ret= SP_multicast( Mbox, SAFE_MESS, group_name, 1, total_length, msg );
 			if( ret < 0 )
 			{
@@ -280,7 +300,6 @@ void del_message(char* msg)
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
-		printf("comparing '%s' and '%s'\n", user_name, temp->user_name);
 		if (!strcmp(temp->user_name, user_name))
 		{
 			printf("found box for %s\n", user_name);
@@ -295,7 +314,6 @@ void del_message(char* msg)
 		printf("user's box was not found\n");
 		return;
 	}
-	printf("searching for message ID %d from server %d\n",msg_id, rec_svr);
 	email_list* temp_email = temp->head_email;
 	email_list* prev_email = NULL;
 	while(temp_email != NULL)
@@ -322,8 +340,6 @@ void del_message(char* msg)
 					free(temp_email);
 				}
 				printf("message deleted\n");
-				//***********************check if user has emails.  If not, delete him.
-
 				return;
 			}
 		}
@@ -371,14 +387,13 @@ void delete_user(char* user_name)
 //Find the message and send it to the user.
 //If it doesn't exist then inform the user.
 /////////////////////////////////////////////////////////////////////////////
-void req_message(mailbox Mbox, char* msg)
+int req_message(mailbox Mbox, char* msg)
 {
 	int msg_id;
 	int rec_svr;
 	int msg_type;
 	char user_name[LEN_USER];
 	char group[MAX_GROUP_NAME];
-	//	char msg[MAX_MSG];
 	int runner = 0;
 	char msgS[MAX_MSG];
 	rec_svr = ((int*)msg)[0];
@@ -391,7 +406,6 @@ void req_message(mailbox Mbox, char* msg)
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
-		printf("comparing '%s' and '%s'\n", user_name, temp->user_name);
 		if (!strcmp(temp->user_name, user_name))
 		{
 			printf("found box for %s\n", user_name);
@@ -409,9 +423,8 @@ void req_message(mailbox Mbox, char* msg)
 		SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
 
 		printf("user's box was not found\n");
-		return;
+		return 0;
 	}
-	printf("searching for message ID %d from server %d\n",msg_id, rec_svr);
 	email_list* temp_email = temp->head_email;
 	while(temp_email != NULL)
 	{
@@ -433,19 +446,15 @@ void req_message(mailbox Mbox, char* msg)
 				runner+=LEN_MSG;
 
 				SP_multicast( Mbox, SAFE_MESS, group, 1, runner, msgS );
-				if (!temp_email->read)
-				{
-					//write update to disk
-					//u_read_w(msg);
-					temp_email->read = 1;
-					/////////////////////
-					//add update to list
-					//add_update_list(UPD_READ, svr_id, mid, msg);
-					//send_update(mid, svr_id);
-					//////////////////////////////////////////////////
-				}
 
-				return;
+				if(temp_email->read)
+				{
+					return 1;
+				}else
+				{
+				temp_email->read = 1;
+				return 0;
+				}
 			}
 		}
 		temp_email = temp_email->next_email;
@@ -457,7 +466,7 @@ void req_message(mailbox Mbox, char* msg)
 	SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
 
 	printf("email was not found.\n");
-
+return 0;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -539,7 +548,6 @@ void u_email_w(char* msg)
 	msg_type = UPD_MSG;
 	rec_svr = svr_id;
 	msg_id = mid;
-	//	strncpy(user_name, msg+sizeof(int)*2, LEN_USER);
 
 	char filename[] = "x.db";
 	filename[0] = svr_id + '0';
@@ -561,7 +569,6 @@ void u_email_w(char* msg)
 	fwrite((void *)(msg+runner), LEN_MSG, 1, fw);
 
 	fclose(fw);
-	printf("\nupdate written to disk of type %d\n", msg_type);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -578,6 +585,7 @@ void read_file()
 	filename[0] = svr_id + '0';
 
 	struct stat buffer;
+
 	if(!stat(filename, &buffer))
 	{
 		if ((fw = fopen (filename, "r")) == NULL)
@@ -587,29 +595,35 @@ void read_file()
 		}
 		while(fread((void *)&upd_type, sizeof(int), 1, fw)!= 0)
 		{
+
 			if (upd_type == UPD_READ)
 			{
-				printf("update received: %d\n", upd_type);
-				fread((void *)update, size_red, 1, fw);
+				((int *)update)[0] = UPD_READ;
+				fread((void *)update+sizeof(int), size_red, 1, fw);
 				update_read(update);
+
 			}else if (upd_type == UPD_DEL)
 			{
-				printf("update received: %d\n", upd_type);
-				fread((void *)update, size_del, 1, fw);
+				((int *)update)[0] = UPD_DEL;
+				fread((void *)update+sizeof(int), size_del, 1, fw);
 				update_delete(update);
 			}else if(upd_type == UPD_MSG)
 			{
-				printf("update received: %d\n", upd_type);
-				if (!fread((void *)update, size_msg, 1, fw))
-				{
-					printf("no data was read\n");
-				}
+				((int *)update)[0] = UPD_MSG;
+				fread((void *)update+sizeof(int), size_msg, 1, fw);
 				update_message(update);
+
 			}else
 			{
 				printf("unrecognized update received: %d\n", upd_type);
+				continue;
 			}
+			list_update(update,upd_type);
+print_list();
+
+//print_view();
 		}
+		printf("trying to read from file..\n");
 		fclose(fw);
 		printf("\nthe file was processed.\n");
 		print_msgs();
@@ -628,27 +642,16 @@ void update_message(char* buffer)
 	int total_length = 0;
 	int rec_svr;
 	int msg_id;
-	rec_svr = ((int*)buffer)[0];
-	msg_id = ((int*)buffer)[1];
+	rec_svr = ((int*)buffer)[1];
+	msg_id = ((int*)buffer)[2];
 	//make sure message ID is good.
 	if (msg_id > mid)
 	{
 		mid = msg_id;
 	}
 	///////////////////////////////
-	//update knowledge matrix
-	if(svr_know[svr_id][rec_svr] < msg_id)
-	{
-		svr_know[svr_id][rec_svr] = msg_id;
-	}else
-	{
-		printf("received an outdated update.\n");
-		return;
-	}
-	////////////////////////
 
-	printf("rec_svr is %d, and msg_id is %d\n", rec_svr, msg_id);
-	total_length = sizeof(int)*2;
+	total_length = sizeof(int)*3;
 	email_list* email = malloc(sizeof(email_list));
 	//get all of the required strings.
 	strncpy(email->to_name, buffer+total_length, LEN_USER);
@@ -728,7 +731,6 @@ void update_message(char* buffer)
 			temp->tail_email= email;
 		}
 	}
-	//add_update_list(UPD_MSG,rec_svr , msg_id, buffer);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -738,8 +740,7 @@ void update_delete(char* msg)
 {
 	int rec_svr;
 	int msg_id;
-	int upd_svr = ((int*)msg)[0];
-	int upd_id = ((int*)msg)[1];
+	int upd_id = ((int*)msg)[2];
 	//make sure message ID is in accordance with everyone.
 	if (upd_id > mid)
 	{
@@ -748,28 +749,15 @@ void update_delete(char* msg)
 	//////////////////////////////////
 	char user_name[LEN_USER];
 
-	rec_svr = ((int*)msg)[2];
-	msg_id = ((int*)msg)[3];
-	strncpy(user_name, msg+sizeof(int)*4, LEN_USER);
-	//update knowledge matrix
-	if(svr_know[svr_id][upd_svr] < upd_id)
-	{
-		svr_know[svr_id][upd_svr] = upd_id;
-	}else
-	{
-		printf("received an outdated update.\n");
-		return;
-	}
-	////////////////////////
+	rec_svr = ((int*)msg)[3];
+	msg_id = ((int*)msg)[4];
+	strncpy(user_name, msg+sizeof(int)*5, LEN_USER);
 
-	//	printf("looking for %s.\n", user_name);
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
-		printf("comparing '%s' and '%s'\n", user_name, temp->user_name);
 		if (!strcmp(temp->user_name, user_name))
 		{
-			printf("found box for %s\n", user_name);
 			break;
 		}else
 		{
@@ -781,7 +769,6 @@ void update_delete(char* msg)
 		printf("user's box was not found\n");
 		return;
 	}
-	printf("searching for message ID %d from server %d\n",msg_id, rec_svr);
 	email_list* temp_email = temp->head_email;
 	email_list* prev_email = NULL;
 	while(temp_email != NULL)
@@ -807,9 +794,6 @@ void update_delete(char* msg)
 					}
 					free(temp_email);
 				}
-				printf("message deleted\n");
-				//***********************check if user has emails.  If not, delete him.
-				//add_update_list(UPD_READ, svr_id, upd_id, msg);
 				return;
 			}
 		}
@@ -826,8 +810,7 @@ void update_read(char* msg)
 {
 	int msg_id;
 	int rec_svr;
-	int upd_svr = ((int*)msg)[0];
-	int upd_id = ((int*)msg)[1];
+	int upd_id = ((int*)msg)[2];
 	//make sure message ID is good.
 	if (upd_id > mid)
 	{
@@ -835,27 +818,14 @@ void update_read(char* msg)
 	}
 	////////////////////////////////
 	char user_name[LEN_USER];
-	//	char group[MAX_GROUP_NAME];
 	int runner = 0;
-	//	char msgS[MAX_MSG];
-	rec_svr = ((int*)msg)[2];
-	msg_id = ((int*)msg)[3];
-	runner = sizeof(int)*4;
+	rec_svr = ((int*)msg)[3];
+	msg_id = ((int*)msg)[4];
+	runner = sizeof(int)*5;
 	strncpy(user_name, msg+runner, LEN_USER);
-	//update knowledge matrix
-	if(svr_know[svr_id][upd_svr] < upd_id)
-	{
-		svr_know[svr_id][upd_svr] = upd_id;
-	}else
-	{
-		printf("received an outdated update.\n");
-		return;
-	}
-	////////////////////////
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
-		printf("comparing '%s' and '%s'\n", user_name, temp->user_name);
 		if (!strcmp(temp->user_name, user_name))
 		{
 			printf("found box for %s\n", user_name);
@@ -870,7 +840,6 @@ void update_read(char* msg)
 		printf("user's box was not found\n");
 		return;
 	}
-	printf("searching for message ID %d from server %d\n",msg_id, rec_svr);
 	email_list* temp_email = temp->head_email;
 	while(temp_email != NULL)
 	{
@@ -880,7 +849,6 @@ void update_read(char* msg)
 			{
 				printf("message found\n");
 				temp_email->read = 1;
-				//add_update_list(UPD_READ, svr_id, upd_id, msg);
 				return;
 			}
 		}
@@ -889,43 +857,6 @@ void update_read(char* msg)
 	printf("email was not found.\n");
 }
 
-/*
-///////////////////////////////////////////////////////////////////////////////
-//add update to list for updates received from user
-///////////////////////////////////////////////////////////////////////////////
-void add_update_list(int update_type, char *buffer)
-{
-update_list* update = malloc(sizeof(update_list));
-update->update_type = update_type;
-update->rec_svr = svr_id;
-update->msg_id = mid;
-((int *)buffer)[0] = update_type;
-if (update_type == UPD_MSG)
-{
-memcpy(update->buffer + sizeof(int), buffer, MAX_MSG - sizeof(int));
-}else
-{
-((int *)buffer)[1] = rec_svr;
-((int *)buffer)[2] = msg_id;
-memcpy(update->buffer + (sizeof(int)*3), buffer, MAX_MSG - sizeof(int)*3);
-}
-
-strncpy(update->buffer, buffer, MAX_MSG);
-update->next_update = NULL;
-if (svr_know[svr_id][rec_svr] > msg_id)
-{
-svr_know[svr_id][rec_svr] = msg_id;
-if (tail_update == NULL)
-{
-tail_update = update;
-head_update = update;
-}else
-{
-tail_update->next_update = update;
-tail_update = update;
-}
-}
-}*/
 ///////////////////////////////////////////////////////////////////////////////
 //add update to list for updates received from user
 ///////////////////////////////////////////////////////////////////////////////
@@ -941,7 +872,6 @@ void add_update_list(int update_type, char *buffer)
 	((int *)msg)[2] = mid;
 	memcpy(msg + (sizeof(int)*3), buffer, MAX_MSG - sizeof(int)*3);
 
-	//	strncpy(update->buffer, buffer, MAX_MSG);
 	memcpy(update->buffer, msg, MAX_MSG);
 	update->next_update = NULL;
 	svr_know[svr_id][svr_id] = mid;
@@ -954,11 +884,7 @@ void add_update_list(int update_type, char *buffer)
 		tail_update->next_update = update;
 		tail_update = update;
 	}
-	printf("type %d\n", ((int *)update->buffer)[0]);
-	printf("svr %d\n", ((int *)update->buffer)[1]);
-	printf("mid %d\n", ((int *)update->buffer)[2]);
-	printf("svr %d\n", svr_id);
-	printf("mid %d\n", mid);
+print_list();
 
 	SP_multicast( m_box, SAFE_MESS, ALL_SVR, 1, MAX_MSG, update->buffer );
 }
@@ -978,6 +904,7 @@ void send_view(mailbox Mbox)
 
 	SP_multicast( Mbox, SAFE_MESS, ALL_SVR , 1, sizeof(msg), msg );
 }
+
 ///////////////////////////////////////////////////////////////////////////////
 //merge received matrices.
 ///////////////////////////////////////////////////////////////////////////////
@@ -985,57 +912,87 @@ void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers)
 {
 	//int offset;
 	int owner = ((int *)buffer)[0];
-	if(svr_upd_received == 0)
+//	int matrix[5][5];
+//	memcpy(matrix, buffer
+	if(num_servers == 1)
 	{
-		for(int i = 0; i < 5; i++)
-		{
-			min_updates[i] = svr_know[svr_id][i];
-			max_updates[i] = 0;
-		}
+		return;
 	}
-	svr_upd_received++;
 
+	svr_upd_received[owner]= 1;
+	printf("\n\n");
+	print_view();
 	if (owner != svr_id)
 	{
 		for(int j = 0; j < 5; j++)
 		{
-			for(int m = 0; m < 5; m++)
+
+			for(int q = 0; q < 5; q++)
 			{
-				if(((int *)buffer)[j*m+1] < min_updates[m])
+				if(((int *)buffer)[j*5+q+1] > svr_know[j][q])
 				{
-					min_updates[m] = ((int *)buffer)[j*m+1];
+					svr_know[j][q] = ((int *)buffer)[j*5+q+1];
 				}
-				if (((int *)buffer)[j*m+1] > max_updates[m])
+				if(((int *)buffer)[j*5+q+1] > mid)
 				{
-					max_updates[m] = ((int *)buffer)[j*m+1];
-				}
-				if(((int *)buffer)[j*m+1] > svr_know[j][m])
-				{
-					svr_know[j][m] = ((int *)buffer)[j*m+1];
+					mid = ((int *)buffer)[j*5+q+1];
 				}
 			}
 		}
 	}
 
-	if (svr_upd_received == num_servers && num_servers != 1)
+	for(int s = 0; s < 5; s++)
 	{
-		for(int p = 0; p< 5; p++)
+		if (servers[s])
 		{
-			if(max_updates[p] == min_updates[p] || max_updates[p] > svr_know[svr_id][p])
+			for(int m = 0; m < 5; m++)
 			{
-				continue;
-			}
-			for(int u = 0; u < svr_id; u++)
-			{
-				if (u == svr_id)
+				if(svr_know[s][m] < min_updates[m])
 				{
-					send_updates(min_updates[p], p);
-				}else if (svr_know[u][p] == max_updates[p])
+					min_updates[m] =svr_know[s][m];
+				}
+				if (svr_know[s][m] > max_updates[m])
 				{
-					break;
+					max_updates[m] =svr_know[s][m];
 				}
 			}
 		}
+	}
+	printf("\n\n");
+	print_view();
+	if (!memcmp((void *)svr_upd_received, (void *) servers, sizeof(int)*5 ))
+	{
+for (int w = 0; w < 5; w++)
+	{
+		printf("the max for %d is %d; the min is %d\n", w, max_updates[w], min_updates[w]);
+	}
+		printf("\nreceived all updates, starting to send.\n");
+		for(int p = 0; p< 5; p++)
+		{
+			printf("min: %d, max: %d\n", min_updates[p], max_updates[p]);
+			if(max_updates[p] == min_updates[p] || max_updates[p] > svr_know[svr_id][p])
+			{
+				printf("should send 2\n");
+				continue;
+			}
+			for(int u = 0; u < svr_id+1; u++)
+			{
+				if(servers[u])
+				{
+					if (u == svr_id)
+					{
+						printf("should send 1\n");
+						send_updates(min_updates[p], p);
+					}else if (svr_know[u][p] == max_updates[p])
+					{
+						break;
+					}
+				}
+			}
+		}
+	}else
+	{
+printf("\nreceived mats, need to continue.\n");
 	}
 }
 
@@ -1081,7 +1038,6 @@ void send_update(int upd_id, int svr_id)
 /////////////////////////////////////////////////////////////////////////////////
 void write_update(char *buffer)
 {
-	//TODO first make sure this is new.
 	int msg_type = ((int *)buffer)[0];
 
 	char filename[] = "x.db";
@@ -1105,7 +1061,108 @@ void write_update(char *buffer)
 		printf("error89\n");
 	}
 	fclose(fw);
-printf("\nupdate written to disk of type %d\n", msg_type);
+	printf("\nupdate written to disk of type %d\n", msg_type);
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+//insert update into list at correct location.
+/////////////////////////////////////////////////////////////////////////////////
+void list_update(char *buffer, int type)
+{
+	int upd_svr =((int *)buffer)[1];
+	int upd_id = ((int *)buffer)[2];
+	update_list *update = malloc(sizeof(update_list));
+	update->update_type = ((int *)buffer)[0];
+	update->rec_svr = upd_svr;
+	update->msg_id =upd_id;
+//	((int *)update->buffer)[0] = type;
+	memcpy(update->buffer, buffer, MAX_MSG);
+	update->next_update = NULL;
+	svr_know[svr_id][upd_svr] = upd_id;
+	svr_know[upd_svr][upd_svr] = upd_id;
+
+	update_list *curr = head_update;
+	update_list *prev = NULL;
+
+	if (tail_update == NULL)
+	{
+		tail_update = update;
+		head_update = update;
+		void print_list();
+
+		return;
+	}
+
+	while (curr != NULL)
+	{
+		if (upd_id > curr-> msg_id)
+		{
+			prev = curr;
+			curr = curr->next_update;
+		}else if(upd_id == curr->msg_id)
+		{
+			if(curr->rec_svr == upd_svr)
+			{
+				printf("received duplicate update");
+				return;
+			}else if(curr->rec_svr > upd_svr)
+			{
+				if(prev == NULL)
+				{
+					update->next_update = head_update;
+					head_update = update;
+				}else
+				{
+					update->next_update = curr;
+					prev->next_update = update;
+				}
+				return;
+			}else
+			{
+				prev = curr;
+				curr = curr->next_update;
+			}
+		}else
+		{
+			if(prev == NULL)
+			{
+				update->next_update = head_update;
+				head_update = update;
+			}else
+			{
+				update->next_update = curr;
+				prev->next_update = update;
+			}
+			void print_list();
+
+			return;
+		}
+	}
+	prev->next_update = update;
+	tail_update = update;
+	void print_list();
+
+	printf("\nupdate written to list of type %d\n", ((int *)buffer)[0]);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//return 1 if update should be processed, 0 otherwise.
+////////////////////////////////////////////////////////////////////////////
+int check_update(char *buffer)
+{
+	if(((int *)buffer)[1] == svr_id)
+	{
+		return 0;
+	}
+	//update knowledge matrix and make sure not duplicate message.
+	if(svr_know[svr_id][((int *)buffer)[1]] < ((int *)buffer)[2])
+	{
+		return 1;
+	}else
+	{
+		printf("received an outdated update.\n");
+		return 0;
+	}
 }
 ////////////////////////////////////////////////////////////////////////////////
 //

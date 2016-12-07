@@ -130,7 +130,7 @@ void add_message(char* buffer);
 void del_message(char* msg);
 void print_msgs();
 void send_header(mailbox Mbox, char* buffer);
-void req_message(mailbox Mbox, char* buffer);
+int req_message(mailbox Mbox, char* buffer);
 void set_proc(int proc_id);
 void set_mbox(mailbox Mbox);
 void read_file();
@@ -144,6 +144,10 @@ void update_message(char *buffer);
 void update_delete(char* msg);
 void update_read(char* msg);
 void write_update(char *buffer);
+void list_update(char *buffer, int type);
+int check_update(char *buffer);
+void reset_svr_upd_received();
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History

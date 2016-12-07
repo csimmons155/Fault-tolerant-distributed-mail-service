@@ -28,17 +28,6 @@ char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  
 int servers_present[5] = { 0 };
 int num_servers_present = 0;
 
-/*
-#define MAX_MESSLEN     102400
-//#define MAX_VSSETS      10
-#define MAX_MEMBERS     100
-#define MAX_MSG_SEND	10
-#define MSG_LEN			304
-#define P_IDX			0
-#define M_IDX			1
-#define R_NUM			2
-*/
-//int start_proc();
 void send_mess(int mess_ind, int proc_ind, int num_to_send);
 void rec_mess(int num_to_rec);
 void Print_help();
@@ -79,8 +68,11 @@ int main( int argc, char *argv[] )
 		Print_help();
 	}
 	set_proc(server_id);
+printf("connected to spread server2.\n");
+
 	//before connecting to spread, read info from file to regain state.
 	read_file();
+printf("connected to spread server3.\n");
 
 	//connect to spread.
 	sp_time test_timeout;
@@ -306,41 +298,41 @@ void process_message(char* msg)
 			add_update_list(UPD_DEL, msg+sizeof(int));
 			break;
 		case REQ_MSG:
-			req_message(Mbox, msg+sizeof(int));
-
+			if (!req_message(Mbox, msg+sizeof(int)))
+			{
 			u_read_w(msg+sizeof(int));
 			add_update_list(UPD_READ, msg+sizeof(int));
+			}
 			break;
 		case VIEW:
 			merge_view(Mbox, msg+sizeof(int), servers_present, num_servers_present);
 			break;
 		case UPD_MSG:
-			printf("received update of type message.");
-			if(((int *)msg)[1] == server_id)
+			if(check_update(msg))
 			{
-				break;
+				printf("received update of type message.");
+				update_message(msg);
+				write_update(msg);
+				list_update(msg, UPD_MSG);
 			}
-			update_message(msg+sizeof(int));
-			write_update(msg);
 			break;
 		case UPD_DEL:
-			if(((int *)msg)[1] == server_id)
+			if (check_update(msg))
 			{
-				break;
+				printf("received update of type delete.");
+				update_delete(msg);
+				write_update(msg);
+				list_update(msg, UPD_DEL);
 			}
-			printf("received update of type delete.");
-			update_delete(msg+sizeof(int));
-			write_update(msg);
-			//TODO save all updates to list.
 			break;
 		case UPD_READ:
-			if(((int *)msg)[1] == server_id)
+			if(check_update(msg))
 			{
-				break;
+				printf("received update of type read.");
+				update_read(msg);
+				write_update(msg);
+				list_update(msg, UPD_READ);
 			}
-			printf("received update of type read.");
-			update_read(msg+sizeof(int));
-			write_update(msg);
 			break;
 		default:
 			printf("\nUnknown command received45. type- %d\n", msg_type);
