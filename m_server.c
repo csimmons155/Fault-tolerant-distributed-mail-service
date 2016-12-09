@@ -13,27 +13,26 @@
 #include "sp.h"
 #include "mutils.h"
 
-static  char    Spread_name[80];
+char    Spread_name[80];
 
-static  char    Private_group[MAX_GROUP_NAME];
-char			join_grp[MAX_GROUP_NAME];//used in Process:REQ_JOIN, REQ_LEV
-static  mailbox Mbox;
-int 			num_in_group = 0;
-int 			total_rec = 0;
-static  int     To_exit = 0;
-static 	FILE 	*fw;
-//user_list*		head_user = NULL;
+char    Private_group[MAX_GROUP_NAME];
+char	join_grp[MAX_GROUP_NAME];//used in Process:REQ_JOIN, REQ_LEV
+mailbox Mbox;
+int		num_in_group = 0;
+int		total_rec = 0;
+int     To_exit = 0;
+FILE 	*fw;
 int		server_id;
-char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
-int servers_present[5] = { 0 };
-int num_servers_present = 0;
+char 	server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
+int 	servers_present[5] = { 0 };
+int 	num_servers_present = 0;
 
-void send_mess(int mess_ind, int proc_ind, int num_to_send);
-void rec_mess(int num_to_rec);
-void Print_help();
-void Bye();
-void initFile(int procIDX);
-void process_message(char* msg);
+void 	send_mess(int mess_ind, int proc_ind, int num_to_send);
+void 	rec_mess(int num_to_rec);
+void 	Print_help();
+void 	Bye();
+void 	initFile(int procIDX);
+void 	process_message(char* msg);
 
 //////////////////////////////////////////////////////////////////////////////
 //MAIN
@@ -41,7 +40,7 @@ void process_message(char* msg);
 int main( int argc, char *argv[] )
 {
 	////////////////Needed to receive messages./////////////////////////
-	static	char		 mess[MAX_MESSLEN];
+	char		 mess[MAX_MESSLEN];
 	char		 sender[MAX_GROUP_NAME];
 	char		 target_groups[MAX_MEMBERS][MAX_GROUP_NAME];
 	membership_info  memb_info;
@@ -68,11 +67,9 @@ int main( int argc, char *argv[] )
 		Print_help();
 	}
 	set_proc(server_id);
-	printf("connected to spread server2.\n");
 
 	//before connecting to spread, read info from file to regain state.
 	read_file();
-	printf("connected to spread server3.\n");
 
 	//connect to spread.
 	sp_time test_timeout;
@@ -93,7 +90,6 @@ int main( int argc, char *argv[] )
 	SP_join ( Mbox, ALL_SVR);
 	SP_join ( Mbox, ALL_TEST);
 	SP_join ( Mbox, SVR_PRES);
-	printf("joined groups.\n");
 
 	while(1)
 	{
@@ -124,15 +120,6 @@ int main( int argc, char *argv[] )
 		}
 		if( Is_regular_mess( service_type ) )
 		{
-			mess[ret] = 0;
-			if     ( Is_unreliable_mess( service_type ) ) printf("received UNRELIABLE ");
-			else if( Is_reliable_mess(   service_type ) ) printf("received RELIABLE ");
-			else if( Is_fifo_mess(       service_type ) ) printf("received FIFO ");
-			else if( Is_causal_mess(     service_type ) ) printf("received CAUSAL ");
-			else if( Is_agreed_mess(     service_type ) ) printf("received AGREED ");
-			else if( Is_safe_mess(       service_type ) ) printf("received SAFE ");
-			printf("message from %s, of type %d, (endian %d) to %d groups \n(%d bytes): %s\n",
-					sender, mess_type, endian_mismatch, num_groups, ret, mess );
 			process_message(mess);
 		}else if( Is_membership_mess( service_type ) )
 		{
@@ -145,16 +132,13 @@ int main( int argc, char *argv[] )
 			if     ( Is_reg_memb_mess( service_type ) )
 			{
 				printf("Received REGULAR membership for group %s with %d members, where I am member %d:\n",
-						sender, num_groups, mess_type );//Delete when fully implemented.
-				for( i=0; i < num_groups; i++ )
-					printf("\t%s\n", &target_groups[i][0] );
-				printf("grp id is %d %d %d\n",memb_info.gid.id[0], memb_info.gid.id[1], memb_info.gid.id[2] );
+						sender, num_groups, mess_type );
 
 				if( Is_caused_join_mess( service_type ) )
 				{
 					if (!strcmp(sender, ALL_SVR))//what servers are visible.
 					{
-reset_svr_upd_received();
+						reset_svr_upd_received();
 						num_servers_present = 0;
 						for (int m = 0; m < 5; m++)
 						{
@@ -164,27 +148,22 @@ reset_svr_upd_received();
 						{
 							if (!strncmp( &target_groups[i][1], BS1, 3))
 							{
-								printf("server 1 present");
 								servers_present[0] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS2, 3))
 							{
-								printf("server 2 present");
 								servers_present[1] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS3, 3))
 							{
-								printf("server 3 present");
 								servers_present[2] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS4, 3))
 							{
-								printf("server 4 present");
 								servers_present[3] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS5, 3))
 							{
-								printf("server 5 present");
 								servers_present[4] = 1;
 								num_servers_present++;
 							}
@@ -193,14 +172,13 @@ reset_svr_upd_received();
 						{
 							send_view();
 						}
-					}					printf("Due to the JOIN of %s\n", memb_info.changed_member );
+					}
+					printf("Due to the JOIN of %s\n", memb_info.changed_member );
 				}else if( Is_caused_leave_mess( service_type ) ){
-
 					printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 				}else if( Is_caused_disconnect_mess( service_type ) ){
 					if (!strcmp(sender, ALL_TEST) || !strcmp(sender, SVR_PRES) || !strcmp(sender, server_list[server_id]) || !strcmp(sender, ALL_SVR))//Stay in known groups
 					{
-						printf("not leaving core groups.\n");
 					}else
 					{
 						if (num_groups == 1)
@@ -214,9 +192,9 @@ reset_svr_upd_received();
 					////////////////////////////////////////////////////////////////
 					//added to handle spmonitor changes.
 					///////////////////////////////////////////////////////////////
-if (!strcmp(sender, ALL_SVR))//what servers are visible.
+					if (!strcmp(sender, ALL_SVR))//what servers are visible.
 					{
-reset_svr_upd_received();
+						reset_svr_upd_received();
 						num_servers_present = 0;
 						for (int m = 0; m < 5; m++)
 						{
@@ -226,27 +204,22 @@ reset_svr_upd_received();
 						{
 							if (!strncmp( &target_groups[i][1], BS1, 3))
 							{
-								printf("server 1 present");
 								servers_present[0] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS2, 3))
 							{
-								printf("server 2 present");
 								servers_present[1] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS3, 3))
 							{
-								printf("server 3 present");
 								servers_present[2] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS4, 3))
 							{
-								printf("server 4 present");
 								servers_present[3] = 1;
 								num_servers_present++;
 							}else if (!strncmp( &target_groups[i][1], BS5, 3))
 							{
-								printf("server 5 present");
 								servers_present[4] = 1;
 								num_servers_present++;
 							}
@@ -256,8 +229,8 @@ reset_svr_upd_received();
 							send_view();
 						}
 					}
-/////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////
+					/////////////////////////////////////////////////////////////////
+					//////////////////////////////////////////////////////////////
 					if (!strcmp(sender, ALL_TEST) || !strcmp(sender, SVR_PRES) || !strcmp(sender, server_list[server_id]) || !strcmp(sender, ALL_SVR))//Stay in known groups
 					{
 						printf("not leaving core groups.\n");
@@ -291,11 +264,7 @@ reset_svr_upd_received();
 							printf("\t%s\n", members[j] );
 					}
 				}
-			}else if( Is_transition_mess(   service_type ) ) {
-				printf("received TRANSITIONAL membership for group %s\n", sender );
-			}else if( Is_caused_leave_mess( service_type ) ){
-				printf("received membership message that left group %s\n", sender );
-			}else printf("received incorrecty membership message of type 0x%x\n", service_type );
+			}
 		} else if ( Is_reject_mess( service_type ) )
 		{
 			printf("REJECTED message from %s, of servicetype 0x%x messtype %d, (endian %d) to %d groups \n(%d bytes): %s\n",
@@ -304,7 +273,6 @@ reset_svr_upd_received();
 
 		fflush(stdout);
 	}
-
 	Bye();
 	return( 0 );
 }
@@ -324,11 +292,8 @@ void    Print_help()
 void	Bye()
 {
 	To_exit = 1;
-
 	printf("\nBye.\n");
-	fclose(fw);
 	SP_disconnect( Mbox );
-
 	exit( 0 );
 }
 
@@ -338,7 +303,7 @@ void	Bye()
 void process_message(char* msg)
 {
 	int msg_type = ((int*) msg)[0];
-	printf("message received of type %d", msg_type);
+	printf("message received of type %d\n", msg_type);
 
 	switch(msg_type)
 	{
@@ -349,7 +314,6 @@ void process_message(char* msg)
 		case REQ_LEV:
 			strcpy(join_grp , msg+sizeof(int));
 			SP_leave ( Mbox, join_grp);
-			printf("leaving group %s.\n", join_grp);
 			break;
 		case REQ_SEND://received email from user.
 			add_message(msg+sizeof(int));
@@ -415,8 +379,6 @@ void process_message(char* msg)
 }
 ////////////////////////////////////////////////////////////////////////////////
 //
-//  Revsion History
-//  11/15/2016 JB: Cleaned up code from project 3 to use in project 4.
 //
 //
 /////////////////////////////////////////////////////////////////////////////////

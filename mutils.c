@@ -1,12 +1,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //    James D. Browne
-//    Eric
-//    Distributed Assignment 2
+//    Chris Simmons
+//    Distributed Assignment 4
 //
 //    mutils.c
-//    Functions required by mcast.c
-//    Date: 2016/10/10
+//    Functions required by m_server.c
+//    Date: 2016/11/16
 //
 ////////////////////////////////////////////////////////////////////////////////
 #include "mutils.h"
@@ -14,7 +14,7 @@
 user_list 		*head_user = NULL;
 update_list 	*head_update = NULL;
 update_list 	*tail_update = NULL;
-static 	FILE 	*fw;
+FILE 	*fw;
 int 			svr_id;
 mailbox 		m_box;
 int				mid = 0;
@@ -25,7 +25,7 @@ int 			min_updates[5] = { 0 };
 int 			max_updates[5] = {0};
 int				update_count = 0;
 
-static  void	Bye(mailbox Mbox);
+static void	Bye(mailbox Mbox);
 void delete_user(char* user_name);
 void print_msgs();
 void send_updates(int upd_id, int svr_id);
@@ -47,6 +47,7 @@ void periodic_mat()
 		send_view();
 	}
 }
+
 //////////////////////////////////////////////////////////////////////////////
 //When a server joins the all server group then reset all relevant variables.
 //////////////////////////////////////////////////////////////////////////////
@@ -60,6 +61,7 @@ void reset_svr_upd_received()
 		ARU[i] = svr_know[svr_id][i];
 	}
 }
+
 ////////////////////////////////////////////////////////////////
 //print the contents of the update list.
 ///////////////////////////////////////////////////////////////
@@ -73,6 +75,7 @@ void print_list()
 		temp = temp->next_update;
 	}
 }
+
 ////////////////////////////////////////////////////////////////
 //Print everyone's messages.
 ///////////////////////////////////////////////////////////////
@@ -124,6 +127,7 @@ void print_view()
 		}
 	}
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 //add received message from user
 ///////////////////////////////////////////////////////////////////////////////
@@ -219,7 +223,7 @@ void send_header(mailbox Mbox, char* buffer)
 		msg_type = SEND_NOHD;
 		memcpy(msg, &msg_type, sizeof(int));
 
-		ret= SP_multicast( Mbox, SAFE_MESS, group_name, 1, sizeof(int), msg );
+		ret= SP_multicast( Mbox, CAUSAL_MESS, group_name, 1, sizeof(int), msg );
 		if( ret < 0 )
 		{
 			SP_error( ret );
@@ -278,7 +282,7 @@ void send_header(mailbox Mbox, char* buffer)
 
 				e_list = e_list->next_email;
 			}
-			ret= SP_multicast( Mbox, SAFE_MESS, group_name, 1, total_length, msg );
+			ret= SP_multicast( Mbox, CAUSAL_MESS, group_name, 1, total_length, msg );
 			if( ret < 0 )
 			{
 				SP_error( ret );
@@ -291,7 +295,7 @@ void send_header(mailbox Mbox, char* buffer)
 //////////////////////////////////////////////////////////////
 //an error happened that the process won't recover from.
 ////////////////////////////////////////////////////////////////
-static  void	Bye(mailbox Mbox)
+static void	Bye(mailbox Mbox)
 {
 
 	printf("\nBye.\n");
@@ -316,7 +320,6 @@ void del_message(char* msg)
 	msg_id = ((int*)msg)[1];
 	strncpy(user_name, msg+sizeof(int)*2, LEN_USER);
 
-	//	printf("looking for %s.\n", user_name);
 	user_list* temp = head_user;
 	while (temp != NULL)
 	{
@@ -388,7 +391,7 @@ void delete_user(char* user_name)
 	}
 	if(temp==NULL)
 	{
-		printf("error- user was not found so cannot be deleted.");
+		printf("error- user was not found so cannot be deleted.\n");
 		return;
 	}
 	if(prev == NULL)
@@ -440,7 +443,7 @@ int req_message(mailbox Mbox, char* msg)
 		msg_type = SEND_NOMSG;
 		memcpy(msgS, &msg_type, sizeof(int));
 
-		SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
+		SP_multicast( Mbox, CAUSAL_MESS, group, 1, sizeof(int), msgS );
 
 		printf("user's box was not found\n");
 		return 0;
@@ -465,7 +468,7 @@ int req_message(mailbox Mbox, char* msg)
 				memcpy(msgS+runner, temp_email->msg, LEN_MSG);
 				runner+=LEN_MSG;
 
-				SP_multicast( Mbox, SAFE_MESS, group, 1, runner, msgS );
+				SP_multicast( Mbox, CAUSAL_MESS, group, 1, runner, msgS );
 
 				if(temp_email->read)
 				{
@@ -483,7 +486,7 @@ int req_message(mailbox Mbox, char* msg)
 	msg_type = SEND_NOMSG;
 	memcpy(msgS, &msg_type, sizeof(int));
 
-	SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
+	SP_multicast( Mbox, CAUSAL_MESS, group, 1, sizeof(int), msgS );
 
 	printf("email was not found.\n");
 	return 0;
@@ -1181,7 +1184,7 @@ void add_update_list(int update_type, char *buffer)
 	}
 	print_list();
 
-	SP_multicast( m_box, SAFE_MESS, ALL_SVR, 1, MAX_MSG, update->buffer );
+	SP_multicast( m_box, CAUSAL_MESS, ALL_SVR, 1, MAX_MSG, update->buffer );
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1197,7 +1200,7 @@ void send_view()
 	((int *)msg)[1] = svr_id;
 	memcpy(msg+sizeof(int)*2, svr_know, sizeof(int)*25);
 
-	SP_multicast(m_box, SAFE_MESS, ALL_SVR , 1, sizeof(msg), msg );
+	SP_multicast(m_box, CAUSAL_MESS, ALL_SVR , 1, sizeof(msg), msg );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1363,7 +1366,7 @@ void send_updates(int min, int server)
 		if(temp->rec_svr == server && temp->msg_id > min)
 		{
 			printf("sending update id %d\n", temp->msg_id);
-			SP_multicast( m_box, SAFE_MESS, ALL_SVR, 1, MAX_MSG, temp->buffer );
+			SP_multicast( m_box, CAUSAL_MESS, ALL_SVR, 1, MAX_MSG, temp->buffer );
 		}
 		temp = temp->next_update;
 	}
@@ -1382,7 +1385,7 @@ void send_update(int upd_id, int svr_id)
 		if(temp->rec_svr == svr_id && temp->msg_id == upd_id)
 		{
 			printf("\n\nupdate found and is being sent\n\n");
-			SP_multicast( m_box, SAFE_MESS, ALL_SVR, 1, MAX_MSG, temp->buffer );
+			SP_multicast( m_box, CAUSAL_MESS, ALL_SVR, 1, MAX_MSG, temp->buffer );
 			return;
 		}
 		temp = temp->next_update;
