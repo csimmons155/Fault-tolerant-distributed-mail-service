@@ -66,7 +66,7 @@ int main( int argc, char *argv[] )
 	sp_time test_timeout;
 	test_timeout.sec = 5;
 	test_timeout.usec = 0;
-	sprintf( Spread_name, "4803");
+	sprintf( Spread_name, "9625");
 	User[0] = 0;
 	strcpy(username, "User");
 	ret = SP_connect_timeout( Spread_name, User, 0, 1, &Mbox, Private_group, test_timeout );
@@ -112,8 +112,8 @@ static	void	User_command()
 		for( i=0; i < sizeof(command); i++ ) command[i] = 0;
 		if( fgets( command, 130, stdin ) == NULL )
 		{
-strcpy(error_msg, "Unrecognized user command.");
-//			printf("Unrecognized user command.  Please make your selection again.\n");
+			strcpy(error_msg, "Unrecognized user command.");
+			//			printf("Unrecognized user command.  Please make your selection again.\n");
 			Print_menu();
 			return;
 		}
@@ -124,8 +124,8 @@ strcpy(error_msg, "Unrecognized user command.");
 				ret = sscanf( &command[2], "%10s", username);
 				if( ret < 1 )
 				{
-strcpy(error_msg, "invalid username.");
-//					printf("invalid username.\n");
+					strcpy(error_msg, "invalid username.");
+					//					printf("invalid username.\n");
 					Print_menu();
 					break;
 				}
@@ -137,15 +137,17 @@ strcpy(error_msg, "invalid username.");
 				new_svr--;//change to index instead of user readable.
 				if( ret < 1 || new_svr > 4 || new_svr < 0)
 				{
-strcpy(error_msg, "invalid server number.  Choose from 1 to 5.");
-//					printf("invalid server number.  Choose from 1 to 5..\n");
+					strcpy(error_msg, "invalid server number.  Choose from 1 to 5.");
+					//					printf("invalid server number.  Choose from 1 to 5..\n");
 					Print_menu();
 					break;
 				}
 				targ_svr = new_svr;
 				//connect_svr();
-				SP_join ( Mbox, server_list[targ_svr]);
-				SP_leave ( Mbox, server_list[targ_svr]);
+				SP_join ( Mbox, SVR_PRES);
+				SP_leave ( Mbox, SVR_PRES);
+				strcpy(error_msg, "Server is not Connecting, try again.");
+				Print_menu();
 				break;
 
 			case 'l':
@@ -174,8 +176,8 @@ strcpy(error_msg, "invalid server number.  Choose from 1 to 5.");
 				break;
 
 			default:
-strcpy(error_msg, "Unknown command.");
-//				printf("Unknown command8\n");
+				strcpy(error_msg, "Unknown command.");
+				//				printf("Unknown command8\n");
 				Print_menu();
 				break;
 		}
@@ -183,7 +185,7 @@ strcpy(error_msg, "Unknown command.");
 		for( i=0; i < sizeof(command); i++ ) command[i] = 0;
 		if( fgets( command, 130, stdin ) == NULL )
 		{
-strcpy(error_msg, "Unrecognized user command.  Please make your selection again.");
+			strcpy(error_msg, "Unrecognized user command.  Please make your selection again.");
 			printf("Unrecognized user command.  Please make your selection again.\n");
 			Print_menu();
 			return;
@@ -203,8 +205,8 @@ strcpy(error_msg, "Unrecognized user command.  Please make your selection again.
 
 				if (tar_email < 1 || tar_email > curr_view)
 				{
-strcpy(error_msg, "value selected unavailable.  Please choose a correct value.");
-//					printf("value selected unavailable.  Please choose a correct value: 1:%d.", curr_view);
+					strcpy(error_msg, "value selected unavailable.  Please choose a correct value.");
+					//					printf("value selected unavailable.  Please choose a correct value: 1:%d.", curr_view);
 					show_header();
 
 				}else
@@ -226,7 +228,7 @@ strcpy(error_msg, "value selected unavailable.  Please choose a correct value.")
 
 				if (tar_email < 1 || tar_email > curr_view)
 				{
-strcpy(error_msg, "value selected unavailable.  Please choose a correct value.");
+					strcpy(error_msg, "value selected unavailable.  Please choose a correct value.");
 				}else
 				{
 					delete_email(tar_email);
@@ -237,8 +239,8 @@ strcpy(error_msg, "value selected unavailable.  Please choose a correct value.")
 			case 'n'://next 10 emails
 				if ((displaying+1)*MAX_DIS>=tot_subs){
 
-strcpy(error_msg, "Already at end of list.");
-//					printf("Already at end of list");
+					strcpy(error_msg, "Already at end of list.");
+					//					printf("Already at end of list");
 				}else
 				{
 					displaying++;
@@ -249,8 +251,8 @@ strcpy(error_msg, "Already at end of list.");
 			case 'p'://prev 10 emails
 				if(displaying == 0)
 				{
-strcpy(error_msg, "Already at beginning of list.");
-//					printf("Already at beginning of list");
+					strcpy(error_msg, "Already at beginning of list.");
+					//					printf("Already at beginning of list");
 				}else
 				{
 					displaying--;
@@ -266,8 +268,8 @@ strcpy(error_msg, "Already at beginning of list.");
 				break;
 
 			default:
-strcpy(error_msg, "Unknown commnad.");
-//				printf("Unknown commnad\n");
+				strcpy(error_msg, "Unknown commnad.");
+				//				printf("Unknown commnad\n");
 				show_header();
 				break;
 		}
@@ -279,14 +281,14 @@ strcpy(error_msg, "Unknown commnad.");
 		request_list();
 	}else
 	{
-strcpy(error_msg, "error - should never get here.");
-//		printf("error - should never get here");
+		strcpy(error_msg, "error - should never get here.");
+		//		printf("error - should never get here");
 	}
 
 }
 static	void	Print_menu()
 {
-system("clear");
+	system("clear");
 	printf("\n");
 	printf("==========\n");
 	printf("User Menu:\n");
@@ -307,7 +309,7 @@ system("clear");
 	printf("\tq -- quit\n");
 
 	printf("\n%s\n", error_msg);
-strcpy(error_msg, "");
+	strcpy(error_msg, "");
 	printf("%s> ", username);
 	fflush(stdout);
 }
@@ -330,20 +332,20 @@ static	void	Read_message()
 	int		 service_type;
 	int16		 mess_type;
 	int		 endian_mismatch;
-	int		 i,j;
+	int		 i;
 	int		 ret;
 
 	service_type = 0;
 
 	ret = SP_receive( Mbox, &service_type, sender, 100, &num_groups, target_groups,
 			&mess_type, &endian_mismatch, sizeof(mess), mess );
-//	printf("\n============================\n");
+	//	printf("\n============================\n");
 
 	if( ret < 0 )
 	{
 		if ( (ret == GROUPS_TOO_SHORT) || (ret == BUFFER_TOO_SHORT) ) {
 			service_type = DROP_RECV;
-//			printf("\n========Buffers or Groups too Short=======\n");
+			//			printf("\n========Buffers or Groups too Short=======\n");
 			ret = SP_receive( Mbox, &service_type, sender, MAX_MEMBERS, &num_groups, target_groups,	&mess_type, &endian_mismatch, sizeof(mess), mess );
 		}
 	}
@@ -365,13 +367,13 @@ static	void	Read_message()
 		norm_rec(mess);
 		/////////////////////////////////////////////////////////
 		mess[ret] = 0;
-/*		if     ( Is_unreliable_mess( service_type ) ) printf("received UNRELIABLE ");
-		else if( Is_reliable_mess(   service_type ) ) printf("received RELIABLE ");
-		else if( Is_fifo_mess(       service_type ) ) printf("received FIFO ");
-		else if( Is_causal_mess(     service_type ) ) printf("received CAUSAL ");
-		else if( Is_agreed_mess(     service_type ) ) printf("received AGREED ");
-		else if( Is_safe_mess(       service_type ) ) printf("received SAFE ");
-		printf("message from %s, of type %d, (endian %d) to %d groups \n(%d bytes): %s\n", sender, mess_type, endian_mismatch, num_groups, ret, mess );*/
+		/*		if     ( Is_unreliable_mess( service_type ) ) printf("received UNRELIABLE ");
+				else if( Is_reliable_mess(   service_type ) ) printf("received RELIABLE ");
+				else if( Is_fifo_mess(       service_type ) ) printf("received FIFO ");
+				else if( Is_causal_mess(     service_type ) ) printf("received CAUSAL ");
+				else if( Is_agreed_mess(     service_type ) ) printf("received AGREED ");
+				else if( Is_safe_mess(       service_type ) ) printf("received SAFE ");
+				printf("message from %s, of type %d, (endian %d) to %d groups \n(%d bytes): %s\n", sender, mess_type, endian_mismatch, num_groups, ret, mess );*/
 	}else if( Is_membership_mess( service_type ) )
 	{
 		free_emails();
@@ -383,131 +385,131 @@ static	void	Read_message()
 		}
 		if     ( Is_reg_memb_mess( service_type ) )
 		{
-//			printf("Received REGULAR membership for group %s with %d members, where I am member %d:\n",
-//					sender, num_groups, mess_type );//Delete when fully implemented.
+			//			printf("Received REGULAR membership for group %s with %d members, where I am member %d:\n",
+			//					sender, num_groups, mess_type );//Delete when fully implemented.
 			for( i=0; i < num_groups; i++ )
-//				printf("\t%s\n", &target_groups[i][0] );
-//			printf("grp id is %d %d %d\n",memb_info.gid.id[0], memb_info.gid.id[1], memb_info.gid.id[2] );
+				//				printf("\t%s\n", &target_groups[i][0] );
+				//			printf("grp id is %d %d %d\n",memb_info.gid.id[0], memb_info.gid.id[1], memb_info.gid.id[2] );
 
-			if( Is_caused_join_mess( service_type ) )
-			{
-				//added for server connect.///////////////////////////////////
-				if (!strcmp(sender, server_list[targ_svr])){//check if server is in its group.
-					for( i=0; i < num_groups; i++ )
-					{
-						if (!strncmp( &target_groups[i][1], server_list[targ_svr], 3))
+				if( Is_caused_join_mess( service_type ) )
+				{
+					//added for server connect.///////////////////////////////////
+					if (!strcmp(sender, SVR_PRES)){//check if server is in its group.
+						for( i=0; i < num_groups; i++ )
 						{
-							connect_svr();//if server is in its group then send connect message.
-							Print_menu();
-							break;
+							if (!strncmp( &target_groups[i][1], server_list[targ_svr], 3))
+							{
+								connect_svr();//if server is in its group then send connect message.
+								Print_menu();
+								break;
+							}
+							if (i == num_groups -1)
+							{
+								strcpy(error_msg, "Chosen server currently not available.");
+								//							printf("Unable to connect to server %d.\n", targ_svr + 1);
+							}
 						}
-						if (i == num_groups -1)
+					}else if (!strcmp(sender, ALL_TEST))//what servers are visible.
+					{
+						ret = 0;
+						system("clear");
+						printf("servers in group-\n");
+						for( i=0; i < num_groups; i++ )
 						{
-							strcpy(error_msg, "Chosen server currently not available.");
-//							printf("Unable to connect to server %d.\n", targ_svr + 1);
+							if (!strncmp( &target_groups[i][1], "BS", 2))
+							{
+								ret = 1;
+								printf("%s\n", &target_groups[i][1]);
+							}
 						}
-					}
-				}else if (!strcmp(sender, ALL_TEST))//what servers are visible.
-				{
-					ret = 0;
-	system("clear");
-					printf("servers in group-\n");
-					for( i=0; i < num_groups; i++ )
-					{
-						if (!strncmp( &target_groups[i][1], "BS", 2))
+						if (!ret)
 						{
-							ret = 1;
-							printf("%s\n", &target_groups[i][1]);
+							printf("none\n");
+						}
+						printf("******************\n");
+						printf("Press [Enter] to continue\n");
+						getchar();
+						Print_menu();
+					}
+					////////////////////////////////////////////////////////////
+					//				printf("Due to the JOIN of %s\n", memb_info.changed_member );
+				}else if( Is_caused_leave_mess( service_type ) ){
+					//added for server connect.///////////////////////////////////
+					if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
+					{
+						if (num_groups == 1)
+						{
+							curr_svr = -1;
+							if (targ_svr == -1){
+								strcpy(error_msg, "disconnected from server");
+								//							printf("disconnected from server\n");
+								Print_menu();
+							}
 						}
 					}
-					if (!ret)
+					////////////////////////////////////////////////////////////
+					//				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
+				}else if( Is_caused_disconnect_mess( service_type ) ){
+					//added for server connect.///////////////////////////////////
+					if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
 					{
-						printf("none\n");
-					}
-					printf("******************\n");
-printf("Press [Enter] to continue\n");
-	getchar();
-					Print_menu();
-				}
-				////////////////////////////////////////////////////////////
-//				printf("Due to the JOIN of %s\n", memb_info.changed_member );
-			}else if( Is_caused_leave_mess( service_type ) ){
-				//added for server connect.///////////////////////////////////
-				if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
-				{
-					if (num_groups == 1)
-					{
-						curr_svr = -1;
-						if (targ_svr == -1){
-							strcpy(error_msg, "disconnected from server");
-//							printf("disconnected from server\n");
-							Print_menu();
+						if (num_groups == 1)
+						{
+							curr_svr = -1;
+							if (targ_svr == -1){
+
+								strcpy(error_msg, "disconnected from server");
+								//							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
+								Print_menu();
+							}
 						}
 					}
-				}
-				////////////////////////////////////////////////////////////
-//				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
-			}else if( Is_caused_disconnect_mess( service_type ) ){
-				//added for server connect.///////////////////////////////////
-				if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
-				{
-					if (num_groups == 1)
-					{
-						curr_svr = -1;
-						if (targ_svr == -1){
+					////////////////////////////////////////////////////////////
 
-							strcpy(error_msg, "disconnected from server");
-//							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
-							Print_menu();
+					//				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
+				}else if( Is_caused_network_mess( service_type ) ){
+					//added for server connect.///////////////////////////////////
+					if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
+					{
+						if (num_groups == 1)
+						{
+							curr_svr = -1;
+							if (targ_svr == -1){
+
+								strcpy(error_msg, "disconnected from server");
+								//							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
+								Print_menu();
+							}
 						}
 					}
-				}
-				////////////////////////////////////////////////////////////
+					////////////////////////////////////////////////////////////
 
-//				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
-			}else if( Is_caused_network_mess( service_type ) ){
-				//added for server connect.///////////////////////////////////
-				if (!strcmp(sender, join_svr_grp))//if server left group then send disconnect.
-				{
-					if (num_groups == 1)
-					{
-						curr_svr = -1;
-						if (targ_svr == -1){
-
-							strcpy(error_msg, "disconnected from server");
-//							printf("\n\n\n\n\n\n\n\ndisconnected from server\n");
-							Print_menu();
-						}
-					}
-				}
-				////////////////////////////////////////////////////////////
-
-//				printf("Due to NETWORK change with %u VS sets\n", memb_info.num_vs_sets);
-				num_vs_sets = SP_get_vs_sets_info( mess, &vssets[0], MAX_VSSETS, &my_vsset_index );
-				if (num_vs_sets < 0) {
-					printf("BUG: membership message has more then %d vs sets. Recompile with larger MAX_VSSETS\n", MAX_VSSETS);
-					SP_error( num_vs_sets );
-					exit( 1 );
-				}
-				for( i = 0; i < num_vs_sets; i++ )
-				{
-//					printf("%s VS set %d has %u members:\n",
-//							(i  == my_vsset_index) ?
-//							("LOCAL") : ("OTHER"), i, vssets[i].num_members );
-					ret = SP_get_vs_set_members(mess, &vssets[i], members, MAX_MEMBERS);
-					if (ret < 0) {
-						printf("VS Set has more then %d members. Recompile with larger MAX_MEMBERS\n", MAX_MEMBERS);
-						SP_error( ret );
+					//				printf("Due to NETWORK change with %u VS sets\n", memb_info.num_vs_sets);
+					num_vs_sets = SP_get_vs_sets_info( mess, &vssets[0], MAX_VSSETS, &my_vsset_index );
+					if (num_vs_sets < 0) {
+						printf("BUG: membership message has more then %d vs sets. Recompile with larger MAX_VSSETS\n", MAX_VSSETS);
+						SP_error( num_vs_sets );
 						exit( 1 );
 					}
-					for( j = 0; j < vssets[i].num_members; j++ )
-						printf("\t%s\n", members[j] );
+					for( i = 0; i < num_vs_sets; i++ )
+					{
+						//					printf("%s VS set %d has %u members:\n",
+						//							(i  == my_vsset_index) ?
+						//							("LOCAL") : ("OTHER"), i, vssets[i].num_members );
+						ret = SP_get_vs_set_members(mess, &vssets[i], members, MAX_MEMBERS);
+						if (ret < 0) {
+							printf("VS Set has more then %d members. Recompile with larger MAX_MEMBERS\n", MAX_MEMBERS);
+							SP_error( ret );
+							exit( 1 );
+						}
+					//	for( j = 0; j < vssets[i].num_members; j++ )
+					//		printf("\t%s\n", members[j] );
+					}
 				}
-			}
 		}else if( Is_transition_mess(   service_type ) ) {
-//			printf("received TRANSITIONAL membership for group %s\n", sender );
+			//			printf("received TRANSITIONAL membership for group %s\n", sender );
 		}else if( Is_caused_leave_mess( service_type ) ){
-//			printf("received membership message that left group %s\n", sender );
+			//			printf("received membership message that left group %s\n", sender );
 		}else printf("received incorrecty membership message of type 0x%x\n", service_type );
 	} else if ( Is_reject_mess( service_type ) )
 	{
@@ -547,12 +549,12 @@ static	int		Check_user(){
 		ret= 0;
 
 		strcpy(error_msg, "Change username before performing this function.");
-//		printf("Change username before performing this function.\n");
+		//		printf("Change username before performing this function.\n");
 	}
 	if (curr_svr == -1)
 	{
 		strcpy(error_msg, "Connect to a server before performing this function.");
-//		printf("Connect to a server before performing this function.\n");
+		//		printf("Connect to a server before performing this function.\n");
 		ret= 0;
 	}
 	if (ret == 0 )
@@ -589,7 +591,7 @@ void connect_svr()
 	int svr_num = targ_svr;
 
 	//join new server and unjoin previous server.
-//	printf("trying to join server %d.\n", svr_num+1);
+	//	printf("trying to join server %d.\n", svr_num+1);
 	msg_type = REQ_JOIN;
 	strcpy(groups, server_list[svr_num] );
 	memcpy(mess, &msg_type, sizeof(int));
@@ -732,7 +734,7 @@ void request_list()
 void norm_rec(char* msg)
 {
 	int msg_type = ((int*) msg)[0];
-//	printf("message received of type %d", msg_type);
+	//	printf("message received of type %d", msg_type);
 
 	if (msg_type != SEND_HEAD && msg_type != SEND_MSG)
 	{
@@ -747,9 +749,9 @@ void norm_rec(char* msg)
 		case SEND_NOHD:
 			//This is if there are no subjects on the server for the user.
 			strcpy(error_msg, "User has no emails to list.");
-/*			printf("\n*******************\n");
-			printf("User, %s, has no emails to list.\n", username);
-			printf("\n*******************\n");*/
+			/*			printf("\n*******************\n");
+						printf("User, %s, has no emails to list.\n", username);
+						printf("\n*******************\n");*/
 			Print_menu();
 			break;
 		case SEND_MSG:
@@ -760,9 +762,9 @@ void norm_rec(char* msg)
 
 		case SEND_NOMSG:
 			strcpy(error_msg, "The email no longer exists.");
-/*			printf("\n\n\n\n\n\n\n\n*******************\n");
-			printf("The email no longer exists.\n");
-			printf("\n*******************\n");*/
+			/*			printf("\n\n\n\n\n\n\n\n*******************\n");
+						printf("The email no longer exists.\n");
+						printf("\n*******************\n");*/
 			free_emails();
 			request_list();
 			break;
@@ -771,7 +773,7 @@ void norm_rec(char* msg)
 			break;
 		default:
 			strcpy(error_msg, "Unknown Message received12.");
-		//	printf("\nUnknown command received12. type- %d\n",msg_type );
+			printf("\nUnknown command received12. type- %d\n",msg_type );
 			break;
 	}
 }
@@ -788,7 +790,7 @@ void process_headers(char* msg)
 	int temp_id;
 	int temp_svr;
 	int size_read = sizeof(int)*3;
-//	printf("expecting %d subject packets", p_req);
+	//	printf("expecting %d subject packets", p_req);
 
 	///////////////////////////
 	//keep track across packets using global variables.
@@ -855,7 +857,7 @@ void process_headers(char* msg)
 			prev = prev->next_head;
 		}
 	}
-//	printf("the first email has %d, %d, %d\n",temp_read, temp_svr, temp_id);
+	//	printf("the first email has %d, %d, %d\n",temp_read, temp_svr, temp_id);
 	for (int q = 0; q < sub_num; q++)
 	{
 		curr= malloc(sizeof(head_list));
@@ -923,7 +925,7 @@ void show_header()
 	   }
 	   */
 	system("clear");
-printf("\n");
+	printf("\n");
 	printf("==========\n");
 	printf("User Menu:\n");
 	printf("----------\n");
@@ -1003,7 +1005,7 @@ void delete_email(int email_num)
 	runner += LEN_USER;
 	memcpy(msg+runner, Private_group, MAX_GROUP_NAME);
 	runner += MAX_GROUP_NAME;
-	ret= SP_multicast( Mbox, SAFE_MESS, join_svr_grp, 1, runner, msg );
+	ret= SP_multicast( Mbox, SAFE_MESS, server_list[curr_svr], 1, runner, msg );
 	if( ret < 0 )
 	{
 		SP_error( ret );
@@ -1073,8 +1075,8 @@ void display_msg(char* msg)
 	printf("Subject: %s\n", subject);
 	printf("Message: %s\n", email);
 	printf("Press [Enter] to continue\n");
-//	getchar();
-//	show_header();
+	//	getchar();
+	//	show_header();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

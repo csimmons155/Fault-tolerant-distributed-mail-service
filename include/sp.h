@@ -1,6 +1,6 @@
 /*
  * The Spread Toolkit.
- *     
+ *
  * The contents of this file are subject to the Spread Open-Source
  * License, Version 1.0 (the ``License''); you may not use
  * this file except in compliance with the License.  You may obtain a
@@ -10,9 +10,9 @@
  *
  * or in the file ``license.txt'' found in this distribution.
  *
- * Software distributed under the License is distributed on an AS IS basis, 
- * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License 
- * for the specific language governing rights and limitations under the 
+ * Software distributed under the License is distributed on an AS IS basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
  * License.
  *
  * The Creators of Spread are:
@@ -32,8 +32,6 @@
  *    Dan Schoenblum       dansch@cnds.jhu.edu - Java interface.
  *
  */
-
-
 
 #ifndef INC_SP
 #define INC_SP
@@ -60,7 +58,7 @@ extern "C" {
 
 /* Interface */
 
-#define		DEFAULT_SPREAD_PORT	4803
+#define		DEFAULT_SPREAD_PORT 4803
 
 #define         SPREAD_VERSION          ( (4 << 24) | ( 4 << 16) | 0 )
 
@@ -137,7 +135,7 @@ extern "C" {
 #define		MAX_CLIENT_SCATTER_ELEMENTS	100
 
 typedef 	int             mailbox;
-typedef		int             service;	
+typedef		int             service;
 
 typedef	struct	dummy_scat_element{
 	char	*buf;
@@ -160,7 +158,7 @@ typedef struct dummy_vs_set_info {
 
 typedef struct dummy_membership_info {
         group_id     gid;
-        char         changed_member[MAX_GROUP_NAME]; 
+        char         changed_member[MAX_GROUP_NAME];
         unsigned int num_vs_sets;
         vs_set_info  my_vs_set;
 } membership_info;
@@ -172,4 +170,3 @@ typedef struct dummy_membership_info {
 #endif
 
 #endif /* INC_SP */
-

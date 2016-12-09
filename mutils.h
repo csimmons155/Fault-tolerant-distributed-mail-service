@@ -58,6 +58,7 @@
 /////////////////////////////
 #define SUB_PER		13
 #define MAX_DIS		10
+#define UPD_SCHD	100
 //server group names, defined to prevent FFing.
 #define BS1			"BS1"
 #define BS2			"BS2"
@@ -66,17 +67,13 @@
 #define BS5			"BS5"
 #define ALL_SVR		"ALL_SVR"
 #define ALL_TEST	"ALL_TEST"
+#define SVR_PRES	"ALL_PRES"
 
 #define MAX_MESSLEN     102400
 #define MAX_VSSETS      10
 #define MAX_MEMBERS     100
 
 #define int32u unsigned int
-
-////////////////////////////////////////////////////////////////////////////////
-//structure holding server public groups.
-////////////////////////////////////////////////////////////////////////////////
-//char server_list[5][4] = {BS1, BS2, BS3, BS4, BS5};//put four to include null.  Check this when working.
 
 ////////////////////////////////////////////////////////////////////////////////
 //Linked list to hold user's messages.
@@ -135,7 +132,7 @@ void set_proc(int proc_id);
 void set_mbox(mailbox Mbox);
 void read_file();
 void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers);
-void send_view(mailbox Mbox);
+void send_view();
 void u_email_w(char *msg);
 void u_del_w(char* msg);
 void u_read_w(char* msg);
@@ -144,9 +141,10 @@ void update_message(char *buffer);
 void update_delete(char* msg);
 void update_read(char* msg);
 void write_update(char *buffer);
-void list_update(char *buffer, int type);
+void list_update(char *buffer);
 int check_update(char *buffer);
 void reset_svr_upd_received();
+void periodic_mat();
 
 ////////////////////////////////////////////////////////////////////////////////
 //

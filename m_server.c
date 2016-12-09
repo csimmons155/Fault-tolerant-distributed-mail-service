@@ -68,17 +68,17 @@ int main( int argc, char *argv[] )
 		Print_help();
 	}
 	set_proc(server_id);
-printf("connected to spread server2.\n");
+	printf("connected to spread server2.\n");
 
 	//before connecting to spread, read info from file to regain state.
 	read_file();
-printf("connected to spread server3.\n");
+	printf("connected to spread server3.\n");
 
 	//connect to spread.
 	sp_time test_timeout;
 	test_timeout.sec = 5;
 	test_timeout.usec = 0;
-	sprintf( Spread_name, "4803");
+	sprintf( Spread_name, "9625");
 	ret = SP_connect_timeout( Spread_name, server_list[server_id], 0, 1, &Mbox, Private_group, test_timeout );
 	if( ret != ACCEPT_SESSION )
 	{
@@ -92,6 +92,7 @@ printf("connected to spread server3.\n");
 	SP_join ( Mbox, server_list[server_id]);
 	SP_join ( Mbox, ALL_SVR);
 	SP_join ( Mbox, ALL_TEST);
+	SP_join ( Mbox, SVR_PRES);
 	printf("joined groups.\n");
 
 	while(1)
@@ -151,8 +152,9 @@ printf("connected to spread server3.\n");
 
 				if( Is_caused_join_mess( service_type ) )
 				{
-					if (!strcmp(sender, "ALL_SVR"))//what servers are visible.
+					if (!strcmp(sender, ALL_SVR))//what servers are visible.
 					{
+reset_svr_upd_received();
 						num_servers_present = 0;
 						for (int m = 0; m < 5; m++)
 						{
@@ -189,15 +191,84 @@ printf("connected to spread server3.\n");
 						}
 						if (num_servers_present>1)
 						{
-							send_view(Mbox);
+							send_view();
 						}
-					}
-					printf("Due to the JOIN of %s\n", memb_info.changed_member );
+					}					printf("Due to the JOIN of %s\n", memb_info.changed_member );
 				}else if( Is_caused_leave_mess( service_type ) ){
+
 					printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 				}else if( Is_caused_disconnect_mess( service_type ) ){
+					if (!strcmp(sender, ALL_TEST) || !strcmp(sender, SVR_PRES) || !strcmp(sender, server_list[server_id]) || !strcmp(sender, ALL_SVR))//Stay in known groups
+					{
+						printf("not leaving core groups.\n");
+					}else
+					{
+						if (num_groups == 1)
+						{
+							printf("Leaving group %s.\n", sender);
+							SP_leave ( Mbox, sender);
+						}
+					}
 					printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
 				}else if( Is_caused_network_mess( service_type ) ){
+					////////////////////////////////////////////////////////////////
+					//added to handle spmonitor changes.
+					///////////////////////////////////////////////////////////////
+if (!strcmp(sender, ALL_SVR))//what servers are visible.
+					{
+reset_svr_upd_received();
+						num_servers_present = 0;
+						for (int m = 0; m < 5; m++)
+						{
+							servers_present[i] = 0;
+						}
+						for( i=0; i < num_groups; i++ )
+						{
+							if (!strncmp( &target_groups[i][1], BS1, 3))
+							{
+								printf("server 1 present");
+								servers_present[0] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS2, 3))
+							{
+								printf("server 2 present");
+								servers_present[1] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS3, 3))
+							{
+								printf("server 3 present");
+								servers_present[2] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS4, 3))
+							{
+								printf("server 4 present");
+								servers_present[3] = 1;
+								num_servers_present++;
+							}else if (!strncmp( &target_groups[i][1], BS5, 3))
+							{
+								printf("server 5 present");
+								servers_present[4] = 1;
+								num_servers_present++;
+							}
+						}
+						if (num_servers_present>1)
+						{
+							send_view();
+						}
+					}
+/////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+					if (!strcmp(sender, ALL_TEST) || !strcmp(sender, SVR_PRES) || !strcmp(sender, server_list[server_id]) || !strcmp(sender, ALL_SVR))//Stay in known groups
+					{
+						printf("not leaving core groups.\n");
+					}else
+					{
+						if (num_groups == 1)
+						{
+							printf("Leaving group %s.\n", sender);
+							SP_leave ( Mbox, sender);
+						}
+					}
 					printf("Due to NETWORK change with %u VS sets\n", memb_info.num_vs_sets);
 					num_vs_sets = SP_get_vs_sets_info( mess, &vssets[0], MAX_VSSETS, &my_vsset_index );
 					if (num_vs_sets < 0) {
@@ -300,38 +371,41 @@ void process_message(char* msg)
 		case REQ_MSG:
 			if (!req_message(Mbox, msg+sizeof(int)))
 			{
-			u_read_w(msg+sizeof(int));
-			add_update_list(UPD_READ, msg+sizeof(int));
+				u_read_w(msg+sizeof(int));
+				add_update_list(UPD_READ, msg+sizeof(int));
 			}
 			break;
 		case VIEW:
 			merge_view(Mbox, msg+sizeof(int), servers_present, num_servers_present);
 			break;
 		case UPD_MSG:
+			periodic_mat();
 			if(check_update(msg))
 			{
 				printf("received update of type message.");
 				update_message(msg);
 				write_update(msg);
-				list_update(msg, UPD_MSG);
+				list_update(msg);
 			}
 			break;
 		case UPD_DEL:
+			periodic_mat();
 			if (check_update(msg))
 			{
 				printf("received update of type delete.");
 				update_delete(msg);
 				write_update(msg);
-				list_update(msg, UPD_DEL);
+				list_update(msg);
 			}
 			break;
 		case UPD_READ:
+			periodic_mat();
 			if(check_update(msg))
 			{
 				printf("received update of type read.");
 				update_read(msg);
 				write_update(msg);
-				list_update(msg, UPD_READ);
+				list_update(msg);
 			}
 			break;
 		default:

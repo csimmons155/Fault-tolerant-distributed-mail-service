@@ -1,6 +1,6 @@
 /*
  * The Spread Toolkit.
- *     
+ *
  * The contents of this file are subject to the Spread Open-Source
  * License, Version 1.0 (the ``License''); you may not use
  * this file except in compliance with the License.  You may obtain a
@@ -10,9 +10,9 @@
  *
  * or in the file ``license.txt'' found in this distribution.
  *
- * Software distributed under the License is distributed on an AS IS basis, 
- * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License 
- * for the specific language governing rights and limitations under the 
+ * Software distributed under the License is distributed on an AS IS basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
  * License.
  *
  * The Creators of Spread are:
@@ -33,11 +33,9 @@
  *
  */
 
-
-
 /*
   Don't include this file, include sp.h
-*/ 
+*/
 
 /* Interface routines */
 int	SP_version( int *major_version, int *minor_version, int *patch_version);
@@ -62,7 +60,7 @@ int	SP_join( mailbox mbox, const char *group );
 
 int	SP_leave( mailbox mbox, const char *group );
 
-int	SP_multicast( mailbox mbox, service service_type, 
+int	SP_multicast( mailbox mbox, service service_type,
 		      const char *group,
 		      int16 mess_type, int mess_len, const char *mess );
 
@@ -95,27 +93,27 @@ int	SP_scat_receive( mailbox mbox, service *service_type,
 			 scatter *scat_mess );
 
 /* get membership info from a message */
-int     SP_get_memb_info( const char *memb_mess, 
+int     SP_get_memb_info( const char *memb_mess,
                           const service service_type,
                           membership_info *memb_info);
 int     SP_get_vs_sets_info( const char *memb_mess,
-                             vs_set_info *vs_sets, 
+                             vs_set_info *vs_sets,
                              int num_vs_sets,
                              unsigned int *my_vs_set_index);
-int     SP_get_vs_set_members( const char *memb_mess, 
-                               const vs_set_info *vs_set, 
+int     SP_get_vs_set_members( const char *memb_mess,
+                               const vs_set_info *vs_set,
                                char member_names[][MAX_GROUP_NAME],
                                int member_names_count);
 
-int     SP_scat_get_memb_info( const scatter *memb_mess_scat, 
+int     SP_scat_get_memb_info( const scatter *memb_mess_scat,
                                const service service_type,
                                membership_info *memb_info);
-int     SP_scat_get_vs_sets_info( const scatter *memb_mess_scat, 
-                                  vs_set_info *vs_sets, 
+int     SP_scat_get_vs_sets_info( const scatter *memb_mess_scat,
+                                  vs_set_info *vs_sets,
                                   int num_vs_sets,
                                   unsigned int *my_vs_set_index);
-int     SP_scat_get_vs_set_members( const scatter *memb_mess_scat, 
-                                    const vs_set_info *vs_set, 
+int     SP_scat_get_vs_set_members( const scatter *memb_mess_scat,
+                                    const vs_set_info *vs_set,
                                     char member_names[][MAX_GROUP_NAME],
                                     int member_names_count);
 

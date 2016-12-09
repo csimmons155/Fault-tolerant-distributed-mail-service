@@ -20,8 +20,10 @@ mailbox 		m_box;
 int				mid = 0;
 int 			svr_know[5][5] = { 0 };
 int 			svr_upd_received[5];//keep track of how many updates have been received from all servers in the group.
+int				ARU[5] = { 0 };
 int 			min_updates[5] = { 0 };
 int 			max_updates[5] = {0};
+int				update_count = 0;
 
 static  void	Bye(mailbox Mbox);
 void delete_user(char* user_name);
@@ -30,14 +32,32 @@ void send_updates(int upd_id, int svr_id);
 void send_update(int upd_id, int svr_id);
 void print_view();
 void print_list();
+void check_message(int rec_svr, int msg_id);
+void clean_updates();
 
+////////////////////////////////////////////////////////////////////////////
+//send update matrix view every UPD_SCHD updates received.
+////////////////////////////////////////////////////////////////////////////
+void periodic_mat()
+{
+	update_count++;
+	if (update_count >UPD_SCHD)
+	{
+		update_count = 0;
+		send_view();
+	}
+}
+//////////////////////////////////////////////////////////////////////////////
+//When a server joins the all server group then reset all relevant variables.
+//////////////////////////////////////////////////////////////////////////////
 void reset_svr_upd_received()
 {
 	for(int i = 0; i < 5; i++)
 	{
-	svr_upd_received[i] = 0;
-min_updates[i] = svr_know[svr_id][i];
-			max_updates[i] = svr_know[svr_id][i];
+		svr_upd_received[i] = 0;
+		min_updates[i] = svr_know[svr_id][i];
+		max_updates[i] = svr_know[svr_id][i];
+		ARU[i] = svr_know[svr_id][i];
 	}
 }
 ////////////////////////////////////////////////////////////////
@@ -45,13 +65,13 @@ min_updates[i] = svr_know[svr_id][i];
 ///////////////////////////////////////////////////////////////
 void print_list()
 {
-update_list *temp = head_update;
-printf("\n\n\nprinting list:\n");
-while (temp!= NULL)
-{
-printf("type %d, svr %d, id %d\n",temp->update_type, temp->rec_svr, temp->msg_id);
-temp = temp->next_update;
-}
+	update_list *temp = head_update;
+	printf("\n\n\nprinting list:\n");
+	while (temp!= NULL)
+	{
+		printf("type %d, svr %d, id %d\n",temp->update_type, temp->rec_svr, temp->msg_id);
+		temp = temp->next_update;
+	}
 }
 ////////////////////////////////////////////////////////////////
 //Print everyone's messages.
@@ -452,8 +472,8 @@ int req_message(mailbox Mbox, char* msg)
 					return 1;
 				}else
 				{
-				temp_email->read = 1;
-				return 0;
+					temp_email->read = 1;
+					return 0;
 				}
 			}
 		}
@@ -466,7 +486,7 @@ int req_message(mailbox Mbox, char* msg)
 	SP_multicast( Mbox, SAFE_MESS, group, 1, sizeof(int), msgS );
 
 	printf("email was not found.\n");
-return 0;
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -618,16 +638,248 @@ void read_file()
 				printf("unrecognized update received: %d\n", upd_type);
 				continue;
 			}
-			list_update(update,upd_type);
-print_list();
+			list_update(update);
+			print_list();
 
-//print_view();
+			//print_view();
 		}
 		printf("trying to read from file..\n");
 		fclose(fw);
 		printf("\nthe file was processed.\n");
 		print_msgs();
 
+	}else
+	{
+		printf("\nNo database was found\n");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////
+//Clean file, remove deleted emails and reads+dels if < ARU.
+/////////////////////////////////////////////////////////////////////
+void clean_file()
+{
+	int upd_type;
+	int size_msg = sizeof(int)*2+LEN_USER*2+LEN_SUB+LEN_MSG;
+	int size_del = sizeof(int)*4+LEN_USER;
+	int size_red = sizeof(int)*4+LEN_USER;
+	char update[MAX_MSG];
+	char filename[] = "x.db";
+	char newname[] = "x.dbx";
+	filename[0] = svr_id + '0';
+newname[0] = svr_id + '0';
+
+	update_list *emails = NULL;
+	update_list *head_emails = NULL;
+	update_list *deletes = NULL;
+	update_list *head_deletes = NULL;
+
+	update_list *temp = NULL;
+		update_list *prev_email = NULL;
+	update_list *prev_deletes = NULL;
+	struct stat buffer;
+
+	if(!stat(filename, &buffer))
+	{
+		if ((fw = fopen (filename, "r")) == NULL)
+		{
+			perror ("fopen");
+			exit (0);
+		}
+		while(fread((void *)&upd_type, sizeof(int), 1, fw)!= 0)
+		{
+
+			if (upd_type == UPD_READ)
+			{
+				((int *)update)[0] = UPD_READ;
+				fread((void *)update+sizeof(int), size_red, 1, fw);
+				temp = malloc(sizeof(update_list));
+				temp->update_type = UPD_READ;
+				temp->rec_svr = ((int*)update)[1];
+				temp->msg_id = ((int*)update)[2];
+				memcpy(temp->buffer, update, MAX_MSG);
+				if(emails == NULL)
+				{
+					emails = temp;
+				}else
+				{
+					emails->next_update = temp;
+					emails = emails->next_update;
+				}
+				if(head_emails== NULL)
+				{
+					head_emails = temp;
+				}
+
+			}else if (upd_type == UPD_DEL)
+			{
+				((int *)update)[0] = UPD_DEL;
+				fread((void *)update+sizeof(int), size_del, 1, fw);
+				temp = malloc(sizeof(update_list));
+				temp->update_type = UPD_DEL;
+				temp->rec_svr = ((int*)update)[1];
+				temp->msg_id = ((int*)update)[2];
+				memcpy(temp->buffer, update, MAX_MSG);
+				if(deletes == NULL)
+				{
+					deletes = temp;
+				}else
+				{
+					deletes->next_update = temp;
+					deletes = deletes->next_update;
+				}
+				if(head_deletes== NULL)
+				{
+					head_deletes = temp;
+				}
+			}else if(upd_type == UPD_MSG)
+			{
+				((int *)update)[0] = UPD_MSG;
+				fread((void *)update+sizeof(int), size_msg, 1, fw);
+				temp = malloc(sizeof(update_list));
+				temp->update_type = UPD_MSG;
+				temp->rec_svr = ((int*)update)[1];
+				temp->msg_id = ((int*)update)[2];
+				memcpy(temp->buffer, update, MAX_MSG);
+				if(emails == NULL)
+				{
+					emails = temp;
+				}else
+				{
+					emails->next_update = temp;
+					emails = emails->next_update;
+				}
+				if(head_emails== NULL)
+				{
+					head_emails = temp;
+				}
+
+			}else
+			{
+				printf("unrecognized update received: %d\n", upd_type);
+				continue;
+			}
+		}
+		fclose(fw);
+
+		deletes = head_deletes;
+		while (deletes != NULL)
+		{
+			emails = head_emails;
+			prev_email = NULL;
+			while (emails != NULL)
+			{
+				if(emails->msg_id >= ARU[emails->rec_svr])
+				{
+					if(emails->update_type == UPD_READ)
+					{
+						if(emails->rec_svr == ((int *)emails->buffer)[3] && emails->msg_id == ((int *)emails->buffer)[4] )
+						{
+							if(prev_email != NULL)
+							{
+								prev_email->next_update = emails->next_update;
+							}else
+							{
+								head_emails = emails->next_update;
+							}
+							temp = emails;
+							emails = emails->next_update;
+							free(temp);
+							continue;
+						}
+					}else// it is a message
+					{
+						if(emails->rec_svr == ((int *)emails->buffer)[1] && emails->msg_id == ((int *)emails->buffer)[2] )
+						{
+							if(prev_email != NULL)
+							{
+								prev_email->next_update = emails->next_update;
+							}else
+							{
+								head_emails = emails->next_update;
+							}
+
+							temp = emails;
+							emails = emails->next_update;
+							free(temp);
+							continue;
+						}
+					}
+				}
+				emails = emails->next_update;
+			}
+			temp = deletes;
+
+			if(temp->msg_id <= ARU[temp->rec_svr])
+			{
+				if(prev_deletes == NULL)
+				{
+					head_deletes = deletes->next_update;
+				}else
+				{
+					prev_deletes->next_update = deletes->next_update;
+				}
+				deletes = deletes->next_update;
+				free(temp);
+			}else
+			{
+				prev_deletes = deletes;
+				deletes = deletes->next_update;
+			}
+		}
+		//merge any remaining deletes into the email list.
+		deletes = head_deletes;
+
+		while(deletes != NULL)
+		{
+			emails = head_emails;
+			temp = NULL;
+			while(emails != NULL)
+			{
+				if(emails->msg_id > deletes->msg_id)
+				{
+					deletes->next_update = temp->next_update;
+					temp->next_update = deletes;
+					break;
+				}else
+				{
+					temp = emails;
+					emails = emails->next_update;
+				}
+				if(emails == NULL)
+				{
+					temp->next_update = deletes;
+				}
+			}
+			deletes = deletes->next_update;
+		}
+
+		//Make a file with remaining list.
+emails = head_emails;
+if ((fw = fopen (newname, "w")) == NULL)
+		{
+			perror ("fopen");
+			exit (0);
+		}
+while (emails != NULL)
+{
+if (emails->update_type == UPD_READ)
+	{
+		fwrite((void *)emails->buffer,sizeof(int)*5 + LEN_USER , 1, fw);
+	}else if (emails->update_type == UPD_DEL)
+	{
+		fwrite((void *)emails->buffer,sizeof(int)*5 + LEN_USER , 1, fw);
+	}else if(emails->update_type == UPD_MSG)
+	{
+		fwrite((void *)emails->buffer,sizeof(int)*3 + LEN_USER*2 + LEN_SUB + LEN_MSG , 1, fw);
+	}
+	temp = emails;
+	emails = emails->next_update;
+	free(temp);
+}
+	fclose(fw);
+rename(newname, filename);
+		//change filename to overwrite the other file.
 	}else
 	{
 		printf("\nNo database was found\n");
@@ -730,6 +982,49 @@ void update_message(char* buffer)
 		{
 			temp->tail_email= email;
 		}
+	}
+	//Just in case updates received out of order.
+	check_message(email->rec_svr, email->msg_id);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//Check a new email update to see if a read or delete was received before the email.
+/////////////////////////////////////////////////////////////////////////////
+void check_message(int rec_svr, int msg_id)
+{
+	update_list *curr = head_update;
+	while(curr != NULL)
+	{
+		if(curr->msg_id > msg_id)
+		{
+			break;
+		}else
+		{
+			curr = curr->next_update;
+		}
+	}
+
+	if (curr == NULL)
+	{
+		return;
+	}
+
+	while(curr != NULL)
+	{
+		if(curr->update_type == UPD_READ)
+		{
+			if(((int *)curr->buffer)[3] == rec_svr && ((int *)curr->buffer)[4] == msg_id)
+			{
+				update_read(curr->buffer);
+			}
+		}else if(curr->update_type == UPD_DEL)
+		{
+			if(((int *)curr->buffer)[3] == rec_svr && ((int *)curr->buffer)[4] == msg_id)
+			{
+				update_delete(curr->buffer);
+			}
+		}
+		curr = curr->next_update;
 	}
 }
 
@@ -884,7 +1179,7 @@ void add_update_list(int update_type, char *buffer)
 		tail_update->next_update = update;
 		tail_update = update;
 	}
-print_list();
+	print_list();
 
 	SP_multicast( m_box, SAFE_MESS, ALL_SVR, 1, MAX_MSG, update->buffer );
 }
@@ -892,7 +1187,7 @@ print_list();
 /////////////////////////////////////////////////////////////////////////////
 //send view sends the matrix view of this process.  format is type, src, matrix
 /////////////////////////////////////////////////////////////////////////////
-void send_view(mailbox Mbox)
+void send_view()
 {
 	//int msg_type = VIEW ;
 	//int ret;
@@ -902,7 +1197,7 @@ void send_view(mailbox Mbox)
 	((int *)msg)[1] = svr_id;
 	memcpy(msg+sizeof(int)*2, svr_know, sizeof(int)*25);
 
-	SP_multicast( Mbox, SAFE_MESS, ALL_SVR , 1, sizeof(msg), msg );
+	SP_multicast(m_box, SAFE_MESS, ALL_SVR , 1, sizeof(msg), msg );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -912,8 +1207,8 @@ void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers)
 {
 	//int offset;
 	int owner = ((int *)buffer)[0];
-//	int matrix[5][5];
-//	memcpy(matrix, buffer
+	//	int matrix[5][5];
+	//	memcpy(matrix, buffer
 	if(num_servers == 1)
 	{
 		return;
@@ -941,6 +1236,12 @@ void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers)
 		}
 	}
 
+	for(int t = 0; t < 5; t++)
+	{
+		min_updates[t] = svr_know[svr_id][t];
+		max_updates[t] = svr_know[svr_id][t];
+	}
+
 	for(int s = 0; s < 5; s++)
 	{
 		if (servers[s])
@@ -958,14 +1259,31 @@ void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers)
 			}
 		}
 	}
+
 	printf("\n\n");
 	print_view();
 	if (!memcmp((void *)svr_upd_received, (void *) servers, sizeof(int)*5 ))
 	{
-for (int w = 0; w < 5; w++)
-	{
-		printf("the max for %d is %d; the min is %d\n", w, max_updates[w], min_updates[w]);
-	}
+		//Determine ARU
+		for(int t = 0; t < 5; t++)
+		{
+			for(int r = 0; r < 5; r++)
+			{
+				if(svr_know[t][r] < ARU[r])
+				{
+					ARU[r] = svr_know[t][r];
+				}
+			}
+		}
+		//Save ARU
+
+		//clean list of updates using newly calculated ARU
+		clean_updates();
+
+		for (int w = 0; w < 5; w++)
+		{
+			printf("the max for %d is %d; the min is %d\n", w, max_updates[w], min_updates[w]);
+		}
 		printf("\nreceived all updates, starting to send.\n");
 		for(int p = 0; p< 5; p++)
 		{
@@ -981,7 +1299,7 @@ for (int w = 0; w < 5; w++)
 				{
 					if (u == svr_id)
 					{
-						printf("should send 1\n");
+						printf("should send 1, from %d to %d.\n", min_updates[p], p);
 						send_updates(min_updates[p], p);
 					}else if (svr_know[u][p] == max_updates[p])
 					{
@@ -990,9 +1308,47 @@ for (int w = 0; w < 5; w++)
 				}
 			}
 		}
+		//Reset servers array
+		for (int u = 0; u < 5; u++)
+		{
+			servers[u] = 0;
+		}
 	}else
 	{
-printf("\nreceived mats, need to continue.\n");
+		printf("\nreceived mats, need to continue.\n");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//Removed unneeded updates from the update list.
+///////////////////////////////////////////////////////////////////////////////
+void clean_updates()
+{
+	update_list *curr = head_update;
+	update_list *prev = NULL;
+	update_list *temp = NULL;
+	while (curr != NULL)
+	{
+		if (curr->msg_id <= ARU[curr->rec_svr])
+		{
+			if(prev == NULL)
+			{
+				head_update = curr->next_update;
+			}else
+			{
+				prev->next_update = curr->next_update;
+			}
+			if(curr->next_update == NULL)
+			{
+				tail_update = prev;
+			}
+			temp = curr;
+			curr = curr->next_update;
+			free(temp);
+		}else
+		{
+			curr = curr->next_update;
+		}
 	}
 }
 
@@ -1006,6 +1362,7 @@ void send_updates(int min, int server)
 	{
 		if(temp->rec_svr == server && temp->msg_id > min)
 		{
+			printf("sending update id %d\n", temp->msg_id);
 			SP_multicast( m_box, SAFE_MESS, ALL_SVR, 1, MAX_MSG, temp->buffer );
 		}
 		temp = temp->next_update;
@@ -1067,7 +1424,7 @@ void write_update(char *buffer)
 //////////////////////////////////////////////////////////////////////////////////
 //insert update into list at correct location.
 /////////////////////////////////////////////////////////////////////////////////
-void list_update(char *buffer, int type)
+void list_update(char *buffer)
 {
 	int upd_svr =((int *)buffer)[1];
 	int upd_id = ((int *)buffer)[2];
@@ -1075,7 +1432,7 @@ void list_update(char *buffer, int type)
 	update->update_type = ((int *)buffer)[0];
 	update->rec_svr = upd_svr;
 	update->msg_id =upd_id;
-//	((int *)update->buffer)[0] = type;
+	//	((int *)update->buffer)[0] = type;
 	memcpy(update->buffer, buffer, MAX_MSG);
 	update->next_update = NULL;
 	svr_know[svr_id][upd_svr] = upd_id;
@@ -1152,11 +1509,13 @@ int check_update(char *buffer)
 {
 	if(((int *)buffer)[1] == svr_id)
 	{
+		printf("this update is from me\n");
 		return 0;
 	}
 	//update knowledge matrix and make sure not duplicate message.
 	if(svr_know[svr_id][((int *)buffer)[1]] < ((int *)buffer)[2])
 	{
+		printf("this is a new update.\n");
 		return 1;
 	}else
 	{
