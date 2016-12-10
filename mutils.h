@@ -5,7 +5,8 @@
 //    Distributed Assignment 4
 //
 //    mutils.h
-//    Header file for definitions and functions required by client.c and
+//    Header file for definitions and functions required by m_server.c,
+//    mutils.c, and m_user.c
 //    server.c
 //    Date: 2016/11/15
 //
@@ -149,7 +150,6 @@ void periodic_mat();
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History
-//  11/15/2016 JB: added basic definitions and structures.
 //
 //
 ////////////////////////////////////////////////////////////////////////////////

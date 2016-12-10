@@ -644,7 +644,7 @@ void read_file()
 			list_update(update);
 			print_list();
 
-			//print_view();
+			//print_view();  Uncomment to see matrix view.
 		}
 		printf("trying to read from file..\n");
 		fclose(fw);
@@ -881,8 +881,8 @@ if (emails->update_type == UPD_READ)
 	free(temp);
 }
 	fclose(fw);
-rename(newname, filename);
 		//change filename to overwrite the other file.
+rename(newname, filename);
 	}else
 	{
 		printf("\nNo database was found\n");
@@ -1208,10 +1208,7 @@ void send_view()
 ///////////////////////////////////////////////////////////////////////////////
 void merge_view(mailbox Mbox, char *buffer, int *servers, int num_servers)
 {
-	//int offset;
 	int owner = ((int *)buffer)[0];
-	//	int matrix[5][5];
-	//	memcpy(matrix, buffer
 	if(num_servers == 1)
 	{
 		return;
@@ -1435,7 +1432,6 @@ void list_update(char *buffer)
 	update->update_type = ((int *)buffer)[0];
 	update->rec_svr = upd_svr;
 	update->msg_id =upd_id;
-	//	((int *)update->buffer)[0] = type;
 	memcpy(update->buffer, buffer, MAX_MSG);
 	update->next_update = NULL;
 	svr_know[svr_id][upd_svr] = upd_id;
@@ -1512,7 +1508,6 @@ int check_update(char *buffer)
 {
 	if(((int *)buffer)[1] == svr_id)
 	{
-		printf("this update is from me\n");
 		return 0;
 	}
 	//update knowledge matrix and make sure not duplicate message.
@@ -1529,8 +1524,6 @@ int check_update(char *buffer)
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Revsion History
-//  10/11/2016 EC: edited the rx and tx functions.
-//                 - Added a TRY-CATCH implementation to help CLI parse
 //
 //
 /////////////////////////////////////////////////////////////////////////////////

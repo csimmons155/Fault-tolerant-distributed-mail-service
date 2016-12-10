@@ -365,7 +365,7 @@ void	Read_message()
 								Print_menu();
 								break;
 							}
-							if (i == num_groups -1)
+							if (i == num_groups -1 && targ_svr != -1)
 							{
 								strcpy(error_msg, "Chosen server currently not available.");
 							}
@@ -558,7 +558,6 @@ void send_email()
 	char to_user[LEN_USER];
 	char subject[LEN_SUB];
 	char email[LEN_MSG];
-	//int total_length = 0;
 	int msg_type = REQ_SEND;
 	int mess_len;
 	char msg[LEN_TOT];
